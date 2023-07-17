@@ -7,14 +7,14 @@
 
 ![rabbit web ui](https://app.rabbitremix.com/gh-sample2.png)
 
-## backend "flow runner" features
+## back-end "flow runner" features
  - fully uses core.async channels for concurrency, etc
  - multi-input blocks (all inputs will wait automatically)
  - conditional pathing
  - a simple map-based interface
  - ability for a "result value" of the entire flow to "ship out" of the flow to an external channel or atom into the rest of your application
 
-## front-end "rabbit debugger" features
+## (100% optional) front-end "rabbit debugger" features
 - canvas based placement and arrangement to "see" your blocks (fns) and how they relate to each other via their connections (async channels)
 - watching the flow "play out" visually
 - "hijacking" channels to send arbitrary values to them and watch the resulting chain-reactions
