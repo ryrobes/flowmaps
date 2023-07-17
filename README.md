@@ -5,7 +5,7 @@
 
 ## 
 
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.ryrobes/flowmaps.svg)](https://clojars.org/org.clojars.ryrobes/flowmaps)
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.ryrobes/flowmaps.svg)](https://clojars.org/org.clojars.ryrobes/flowmaps) ![example workflow](https://github.com/ryrobes/flowmaps/actions/workflows/clojure.yml/badge.svg)
 
 ![rabbit web ui](https://github.com/ryrobes/flowmaps/blob/main/resources/public/images/gh-sample1.png?raw=true)
 
