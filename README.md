@@ -23,7 +23,7 @@
 
 ## 
 
-![rabbit web ui](https://app.rabbitremix.com/gh-looped.gif)
+![looping blocks and views](https://app.rabbitremix.com/gh-looped3.gif)
 
 Example of blocks that have a singular purpose of displaying data - but only when viewed through the UI - these "front end views" will get ignored when running headlessly.
 
