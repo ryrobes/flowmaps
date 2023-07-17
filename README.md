@@ -23,7 +23,9 @@
 
 ## 
 
-<img align="right" src="https://app.rabbitremix.com/gh-looped.gif"> Example of blocks that have a singular purpose of displaying data - but only when viewed throught the UI, these "front end views" will get ignored when running headlessly.<br clear="right"/>
+![rabbit web ui](https://app.rabbitremix.com/gh-looped.gif)
+
+Example of blocks that have a singular purpose of displaying data - but only when viewed through the UI - these "front end views" will get ignored when running headlessly.
 
 ## 
 
