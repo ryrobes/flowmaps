@@ -1,5 +1,5 @@
-(defproject org.clojars.ryrobes/flowmaps "0.1.1" ;; temp group
-  :description "FlowMaps: Flow Based Programming Clojure Micro-Framework"
+(defproject com.ryrobes/flowmaps "0.1.1-SNAPSHOT"
+  :description "FlowMaps: Flow Based Programming Micro-Framework for Clojure"
   :url "https://github.com/ryrobes/flowmaps"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}
