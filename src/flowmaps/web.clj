@@ -56,7 +56,7 @@
 (def web-server (atom nil))
 
 (defn create-web-server! []
-  (ut/ppln [:*web (format "starting web server @ %d" 8888)])
+  (ut/ppln [:*web (format "starting web ui @ http://localhost/%d" 8888) "🐇" ])
   (reset! web-server
           (future (http/start runnable-service))))
 
@@ -89,10 +89,11 @@
 ;;           (jetty/run-jetty web-handler ring-options)))
 
 (defn start! []
-  (try (do (ut/ppln [:*websocket (format "starting websocket server @ %d" 3000)])
-      (.start websocket-server)
-      (create-web-server!)
-      (reset! websocket? true)) (catch Exception e (println e))))
+  (try (do
+         ;(ut/ppln [:*websocket (format "starting websocket server @ %d" 3000)])
+         (.start websocket-server)
+         (create-web-server!)
+         (reset! websocket? true)) (catch Exception e (println e))))
 
 (defn stop! []
   (ut/ppln [:*websocket (format "stopping websocket server @ %d" 3000)])
