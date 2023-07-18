@@ -43,7 +43,7 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
         {:components {:static-val1 10
                       :plus-10 #(+ 10 %)}
          :connections [[:static-val :plus-10]]}
-         ;; should create one channel and return 20
+         ;; should create one channel and return 20 via output channel/atom if provided
         ```
 - **flow-runner**
     - the *flowmaps.core/flow* function that bootstraps the channels, seeds their values, and begins execution. Called "flow runner" or "runner". Can optionally return the "final" values via a channel, atom (or separate reporting fn *flowmaps.core/flow-results* (see below)).
