@@ -14,7 +14,7 @@ While it's nomenclature may diverge from Morrison's FBP terminology to be more c
 
 Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and SEE how these flows are executed, their parallelism (if any), and more importantly - interactive experimentation and iterative development. One of the benefits of FBP is the ability for teams to better comprehend large complex systems as drawn out as boxes and lines - I wanted to provide a "live" version of that.
 
-# **I wanted to write core.async flows without a blindfold on.**
+# **I wanted to write core.async flows w/o a blindfold**
 
 
 ![rabbit web ui](https://app.rabbitremix.com/gh-sample2.png)
