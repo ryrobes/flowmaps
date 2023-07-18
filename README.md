@@ -1,8 +1,8 @@
 # flowmaps
 ### A *Flow Based Programming* Micro-Framework for Clojure with canvas based debugger
 
-
-[![Clojars Project](https://img.shields.io/clojars/v/com.ryrobes/flowmaps.svg)](https://clojars.org/com.ryrobes/flowmaps) ![example workflow](https://github.com/ryrobes/flowmaps/actions/workflows/clojure.yml/badge.svg)
+[![Clojars Project](https://img.shields.io/clojars/v/com.ryrobes/flowmaps.svg?include_prereleases)](https://clojars.org/com.ryrobes/flowmaps)
+ ![example workflow](https://github.com/ryrobes/flowmaps/actions/workflows/clojure.yml/badge.svg)
 
 ![looping blocks and views](https://app.rabbitremix.com/gh-looped4.gif)
 
