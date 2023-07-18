@@ -301,6 +301,15 @@ Value explorer - double-clicking on a block's titlebar will open up a side panel
 
 ![rabbit web ui primer 5](https://app.rabbitremix.com/gh-primer5.png)
 
+Double clicking on the channel pill on the left sidebar to expand it. It will contain:
+- a REPL command to push a value to that channel (copy-pasta all the way!)
+- a set of the last 4 values that channel has "seen" (click on one of them to RESEND that value to the channel)
+- a text box to send an *arbitrary* value to this channel
+
+This is a great way to interact with the flow once it's been booted up. The channels are all still open and "running" so placing values upstream allows you to "watch" them flow back down through the system.
+
+**More documentation WIP**
+
 
 ## TODO / ideas (as of 7/17/23, in no particular order)
 - spec for flow-map data sent to the *flow* fn with useful errors
