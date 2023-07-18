@@ -56,7 +56,7 @@
 (def web-server (atom nil))
 
 (defn create-web-server! []
-  (ut/ppln [:*web (format "starting web ui @ http://localhost/%d" 8888) "🐇" ])
+  (ut/ppln [:*web (format "starting web ui @ http://localhost:%d" 8888) "🐇" ])
   (reset! web-server
           (future (http/start runnable-service))))
 

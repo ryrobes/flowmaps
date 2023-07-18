@@ -80,7 +80,7 @@
               start (System/currentTimeMillis)
               the-path (try
                          (apply max-key count (apply concat (vals (select-keys fp poss-path-keys))))
-                         (catch Exception e [e]))
+                         (catch Exception _ [:error-path-issue!]))
               done-channel-push? (and (= ff :done) (ut/chan? done-ch))]
 
           (when (= ff :done)  ;; process any :done stuff, debug or not. ends this flow-chain-path basically
