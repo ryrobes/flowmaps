@@ -1,5 +1,7 @@
 # flowmaps
-### A *Flow Based Programming* Micro-Framework for Clojure with canvas based debugger
+## A "Flow Based Programming" *sequencer* for Clojure with interactive flow debugger & visualizer
+
+Construct and orchestrate stand-alone core.async pipelines with ease or use it to encapsulate & manage complex 'flows' within your application.
 
 [![Clojars Project](https://img.shields.io/clojars/v/com.ryrobes/flowmaps.svg?include_prereleases)](https://clojars.org/com.ryrobes/flowmaps)
  ![example workflow](https://github.com/ryrobes/flowmaps/actions/workflows/clojure.yml/badge.svg)
@@ -19,54 +21,25 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 
 ![rabbit web ui](https://app.rabbitremix.com/gh-sample2.png)
 
-## back-end "flow runner" features
+## Back-end "flow runner" features
  - fully uses core.async channels for concurrency, etc
  - multi-input blocks (all inputs will wait automatically)
  - conditional pathing
- - a simple map-based interface
+ - a straightforward "map-based" interface
  - ability for a "result value" of the entire flow to "ship out" of the flow to an external channel or atom into the rest of your application
 
-## (100% optional) front-end "rabbit debugger" features
+## Front-end "rabbit-ui" features (optional) 
 - canvas based placement and arrangement to "see" your blocks (fns) and how they relate to each other via their connections (async channels)
 - watching the flow "play out" visually
 - "hijacking" channels to send arbitrary values to them and watch the resulting chain-reactions
 - optional block "views" (as in screenshot above), gives you the ability to write hiccup, re-com, and vega specs to render the values as they flow through the system - very useful in debugging or just monitoring your flow as it runs
 - simple gantt chart timeline to better understand flow parallelism
 
-## Basic concepts
-
-- **flow-map**
-    - The flow-map a literal Clojure map that contains all the info needed to bootstrap up a flow (or core.async chain). There are only 2 *required* keys.
-        - *:components* - a reference mapping of a literal clojure function to a keyword "block" name. Can just be a static value (which just gets passed), a single fn alone, or a map with a :fn key and various values - see more advanced options in the examples.
-        - *:connections* - a simple vector of 1:1 connections between blocks. Each of these will become a dedicated channel (and often more channels will be automatically created to due to *implied* connections)
-        ```clojure
-        {:components {:static-val1 10
-                      :plus-10 #(+ 10 %)}
-         :connections [[:static-val :plus-10]]}
-         ;; should create one channel and return 20 via output channel/atom if provided
-        ```
-- **flow-runner**
-    - the *flowmaps.core/flow* function that bootstraps the channels, seeds their values, and begins execution. Called "flow runner" or "runner". Can optionally return the "final" values via a channel, atom (or separate reporting fn *flowmaps.core/flow-results* (see below)).
-- **blocks**
-    - can be called a component or block function, etc. It's a member of the :components key above and the most basic building block (heh) of a flow. many of my examples use anon function wrappers for this since it makes the definition of where inputs will go, straightforward. More complex examples with multi-arity mappings below. (we are essentially defining the "input" and "output" ports of the block)
-- **connections / "lines"**
-    - a dedicated channel that provides data / signal from one place to another. In the rabbit-ui each line is in fact a channel - and when pushing arbitrary values around (via the left-side channel panel) you are putting the value "on the line" as opposed to "in a block", which is an important distinction in large more complex flows
-- **views**
-    - and optional key inside a block mapping that contains a server-side function that produces a hiccup, re-com, vega, vega-lite data structure that the front-end will understand (see examples below). This function will be passed a single value - which is the return value of *that* block - meaning that the view is processed after the block function. Note: If the rabbit-ui isn't running, this :view does nothing.
-- **rabbit**
-    - The optional canvas based UI. I have a history of flow-based canvas UIs - they all revolve around this grand "Data Rabbit" concept I have been working on for years. Projects like this are a opportunity to apply those concepts to niche areas. Anytime I mention "rabbit", "rabbit-ui", "the debugger", "the visualizer"- this is what I am referring to.
-- **canvas**
-    - The rabbit canvas where the flow is laid out upon. :canvas is also an optional flow map key - see below for examples that contains the :x :y coordinates of the block in "rabbit space", but also the height and width of that block via :h :w. Again, if running headlessly in production - these values are ignored.
-- **path / track**
-    - Sometimes used to refer to a set of blocks and channels together. i.e. "branching path", "looping path". A track can also be a segment of the flow that is unconnected to the larger flow and runs it's blocks independently. 
-- **sub-flow**
-    - an entire flow that gets executed as a block (not implemented yet! but important to understand, conecptually)
 
 
+## Some examples
 
-## Examples
-
-# Super simple flow example
+# Basic flow example
 
 ![rabbit web ui](https://app.rabbitremix.com/gh-sample1.png)
 
@@ -213,7 +186,7 @@ A slight ramp up in complexity from the above flow. Contains a loop that exists 
 
 ```
 
-# flow fn options
+# "flow" function options
 
 The "flowmaps.core/flow" fn is what creates the channels and executes the flow by pushing static values on to the starter channels. Think of it as setting up the dominoes and tapping the first one. From there on out it's in the hands of the channel connections and the "flowmaps.core/process", which you shouldn't need to ever user directly.
 
@@ -261,7 +234,7 @@ Simple options example:
 
 ![rabbit web ui](https://app.rabbitremix.com/gh-sample5.png)
 
-# flow-results fn
+# "flow-results" function
 Work in progress. Iterates through the various "paths" that have been resolved and gives the last value of each of those steps.
 Example:
 ```clojure
@@ -307,6 +280,40 @@ Double clicking on the channel pill on the left sidebar to expand it. It will co
 - a text box to send an *arbitrary* value to this channel
 
 This is a great way to interact with the flow once it's been booted up. The channels are all still open and "running" so placing values upstream allows you to "watch" them flow back down through the system.
+
+
+## Basic term reference
+
+- **flow-map**
+    - The flow-map a literal Clojure map that contains all the info needed to bootstrap up a flow (or core.async chain). There are only 2 *required* keys.
+        - *:components* - a reference mapping of a literal clojure function to a keyword "block" name. Can just be a static value (which just gets passed), a single fn alone, or a map with a :fn key and various values - see more advanced options in the examples.
+        - *:connections* - a simple vector of 1:1 connections between blocks. Each of these will become a dedicated channel (and often more channels will be automatically created to due to *implied* connections)
+        ```clojure
+        {:components {:static-val1 10
+                      :plus-10 #(+ 10 %)}
+         :connections [[:static-val :plus-10]]}
+         ;; should create one channel and return 20 via output channel/atom if provided
+        ```
+- **flow-runner**
+    - the *flowmaps.core/flow* function that bootstraps the channels, seeds their values, and begins execution. Called "flow runner" or "runner". Can optionally return the "final" values via a channel, atom (or separate reporting fn *flowmaps.core/flow-results* (see below)).
+- **blocks**
+    - can be called a component or block function, etc. It's a member of the :components key above and the most basic building block (heh) of a flow. many of my examples use anon function wrappers for this since it makes the definition of where inputs will go, straightforward. More complex examples with multi-arity mappings below. (we are essentially defining the "input" and "output" ports of the block)
+- **connections / "lines"**
+    - a dedicated channel that provides data / signal from one place to another. In the rabbit-ui each line is in fact a channel - and when pushing arbitrary values around (via the left-side channel panel) you are putting the value "on the line" as opposed to "in a block", which is an important distinction in large more complex flows
+- **views**
+    - and optional key inside a block mapping that contains a server-side function that produces a hiccup, re-com, vega, vega-lite data structure that the front-end will understand (see examples below). This function will be passed a single value - which is the return value of *that* block - meaning that the view is processed after the block function. Note: If the rabbit-ui isn't running, this :view does nothing.
+- **rabbit**
+    - The optional canvas based UI. I have a history of flow-based canvas UIs - they all revolve around this grand "Data Rabbit" concept I have been working on for years. Projects like this are a opportunity to apply those concepts to niche areas. Anytime I mention "rabbit", "rabbit-ui", "the debugger", "the visualizer"- this is what I am referring to.
+- **canvas**
+    - The rabbit canvas where the flow is laid out upon. :canvas is also an optional flow map key - see below for examples that contains the :x :y coordinates of the block in "rabbit space", but also the height and width of that block via :h :w. Again, if running headlessly in production - these values are ignored.
+- **path / track**
+    - Sometimes used to refer to a set of blocks and channels together. i.e. "branching path", "looping path". A track can also be a segment of the flow that is unconnected to the larger flow and runs it's blocks independently. 
+- **sub-flow**
+    - an entire flow that gets executed as a block (not implemented yet! but important to understand, conecptually)
+
+
+
+
 
 **More documentation WIP**
 
