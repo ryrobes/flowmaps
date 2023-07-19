@@ -65,29 +65,6 @@
   (reset! web-server
           nil))
 
-;; (defonce server-ref (atom nil))
-
-;; (defn start-server []
-;;   (reset! server-ref
-;;           (future
-;;             (let [service-map service
-;;                   config {:port 8888}
-;;                   started-server (server/start
-;;                                   (server/default-server-fn service-map)
-;;                                   config)]
-;;               started-server))))
-
-;; (defn stop-server []
-;;   (when @server-ref
-;;     (server/stop @server-ref)
-;;     (reset! server-ref nil)))
-
-
-;; (defn create-server! []
-;;   (ut/ppln [:flowmaps-ui "starting websocket server @ " 3000])
-;;   (reset! websocket-server
-;;           (jetty/run-jetty web-handler ring-options)))
-
 (defn start! []
   (try (do
          ;(ut/ppln [:*websocket (format "starting websocket server @ %d" 3000)])
@@ -113,17 +90,17 @@
         (recur)))
     results))
 
-(def queue-atom-alt (atom clojure.lang.PersistentQueue/EMPTY))
+;; (def queue-atom-alt (atom clojure.lang.PersistentQueue/EMPTY))
 
-(defmethod wl/handle-subscription :result-history [{:keys [kind client-id]}]
-  (let [results (async/chan)]
-    (async/go-loop []
-      (async/<! (async/timeout 500))
-      (if-let [item (ut/dequeue! queue-atom-alt)]
-        (when (async/>! results item)
-          (recur))
-        (recur)))
-    results))
+;; (defmethod wl/handle-subscription :result-history [{:keys [kind client-id]}]
+;;   (let [results (async/chan)]
+;;     (async/go-loop []
+;;       (async/<! (async/timeout 500))
+;;       (if-let [item (ut/dequeue! queue-atom-alt)]
+;;         (when (async/>! results item)
+;;           (recur))
+;;         (recur)))
+;;     results))
 
 (defmethod wl/handle-request :channel-gantt-data [_]
   [[:channel-history] (vec (for [{:keys [channel start end path data-type value]} @db/channel-history
@@ -141,16 +118,16 @@
   [[:network-map] @db/working-data])
 
 (defmethod wl/handle-request :push-channel-value [{:keys [kind channel-name value]}]
-  ; [{:keys [kind stuff]}]
   (do (ut/ppln [:incoming-channel-push kind channel-name value])
     (async/put! (get @db/channels-atom channel-name) {:sender :webpush :value value})
     [[:pushed channel-name] value]))
 
 (defn push [keypath values & [ts]]
-  (swap! 
+  (let [bd (try (get-in @db/block-defs [(nth keypath 1)]) (catch Exception _ nil))]
+    (swap!
    ;(rand-nth [queue-atom-alt queue-atom])
-   queue-atom
-   conj [keypath values ts]))
+     queue-atom
+     conj [keypath values ts (str bd)])))
 
-(defn push-alt [keypath values]
-  (swap! queue-atom-alt conj [keypath values]))
+;; (defn push-alt [keypath values]
+;;   (swap! queue-atom-alt conj [keypath values]))

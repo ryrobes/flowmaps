@@ -10,6 +10,7 @@
 (defonce channel-history (atom []))
 (defonce chains-completed (atom []))
 (defonce port-accumulator (atom {}))
+(defonce block-defs (atom {}))
 (def channels-atom (atom {})) ;; ref for putting things on later via REPL or whatever.
 (def condi-channels-atom (atom {})) ;; ref for putting things on later via REPL or whatever.
 (def working-data (atom {}))

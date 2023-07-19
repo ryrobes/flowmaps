@@ -215,15 +215,17 @@
   (reset! db/results-atom {})
   (reset! db/channel-history [])
   (reset! db/channel-log [])
+  (reset! db/block-defs {}) ;; save and ship these in case the UI somehow missed a creation (saves the UI from weird state)
 
   ;; channel clean up?
   (when #_{:clj-kondo/ignore [:not-empty?]}      ;; clean up old channels on new run, if 
         (and (not (empty? @db/channels-atom))    ;; - we have channels
-             (not (true? @web/websocket?)) ;; - web ui is NOT running
+             (not (true? @web/websocket?))       ;; - web ui is NOT running
              (not (get opts-map :debug? true))   ;; - debug is NOT enabled
              false)                              ;; bug with this TODO, critical (not that ppl couldn't clean their own channels from @db/channels-atom, but still!)
     (doseq [[k c] @db/channels-atom]             ;; * will be fixed with the concurrent flow / subflow / flow-id changes coming next
-      (try (do (ut/ppln [:closing-channel k c])
+      (try #_{:clj-kondo/ignore [:redundant-do]}
+           (do (ut/ppln [:closing-channel k c])
         (async/close! c)) (catch Exception e (ut/ppln [:error-closing-channel e k c])))))
 
   (try 
@@ -289,28 +291,31 @@
         #_{:clj-kondo/ignore [:redundant-do]} ;; lol, it is, in fact, NOT redundant.
         (do
           (doseq [[bid v] components
-                  :when (not (= bid :done))] ;; no reason to render :done as a block? redundant
-            (web/push [:blocks bid] (merge {:y (or (get-in network-map [:canvas bid :y]) (get v :y (get-in coords-map [bid :y]))) ;; deprecated locations TODO
-                                            :x (or (get-in network-map [:canvas bid :x]) (get v :x (get-in coords-map [bid :x]))) ;; deprecated locations
-                                            :base-type :artifacts
-                                            :width (or (get-in network-map [:canvas bid :w]) (get v :w 240)) ;; deprecated locations
-                                            :height (or (get-in network-map [:canvas bid :h]) (get v :h 255)) ;; deprecated locations
-                                            :type :text
-                                            ;:hidden? (true? (= bid :done))
-                                            :flowmaps-created? true
-                                            :block-type "map2"}
-                                           (if (get v :view)
-                                             {:view-mode "view"
-                                              :options [{:prefix ""
-                                                         :suffix ""
-                                                         :block-keypath [:view-mode]
-                                                         :values ["data" "view"]}]} {}))))
+                  :when (not (= bid :done))
+                  :let [block-def (merge {:y (or (get-in network-map [:canvas bid :y]) (get v :y (get-in coords-map [bid :y]))) ;; deprecated locations TODO
+                                          :x (or (get-in network-map [:canvas bid :x]) (get v :x (get-in coords-map [bid :x]))) ;; deprecated locations
+                                          :base-type :artifacts
+                                          :width (or (get-in network-map [:canvas bid :w]) (get v :w 240)) ;; deprecated locations
+                                          :height (or (get-in network-map [:canvas bid :h]) (get v :h 255)) ;; deprecated locations
+                                          :type :text
+                                          :flowmaps-created? true
+                                          :block-type "map2"}
+                                         (if (get v :view)
+                                           {:view-mode "view"
+                                            :options [{:prefix ""
+                                                       :suffix ""
+                                                       :block-keypath [:view-mode]
+                                                       :values ["data" "view"]}]} {}))]] ;; no reason to render :done as a block? redundant
+            (do (swap! db/block-defs assoc-in [bid] block-def)
+              (web/push [:blocks bid] block-def)))
           (doseq [[bid inputs] input-mappings
-                  :when (not (= bid :done))] ;; not rendering :done blocks, so we sure as hell dont want to draw links to them
-            (web/push [:blocks bid :inputs] (vec (conj
-                                                  (vec (for [i inputs]
-                                                         [i [:text [:no nil]]]))
-                                                  [nil [:text [:paragraph 0]]]))))))
+                  :when (not (= bid :done))
+                  :let [inputs (vec (conj
+                                     (vec (for [i inputs]
+                                            [i [:text [:no nil]]]))
+                                     [nil [:text [:paragraph 0]]]))]] ;; not rendering :done blocks, so we sure as hell dont want to draw links to them
+            (do (swap! db/block-defs assoc-in [bid :inputs] inputs)
+              (web/push [:blocks bid :inputs] inputs)))))
 
       (reset! db/channels-atom channels)
       (reset! db/condi-channels-atom condi-channels)
@@ -324,8 +329,8 @@
                                         :data-type "boot"}))
       (doseq [from (keys components)]
         (let [subflow-override? (not (nil? (get subflow-map from)))
-              ;fn-is-subflow? (true? (and (not (nil? (get (map? (get components from)) :connections))) ;; TODO subflow imp
-              ;                           (not (nil? (get (map? (get components from)) :components)))))
+              ;fn-is-subflow? (true? (and (not (nil? (get (map? (get components from)) :connections)))  ;; TODO subflow imp
+              ;                           (not (nil? (get (map? (get components from)) :components))))) ;; make specs for various block map shapes?
               from-val (if subflow-override?
                          (get subflow-map from)
                          (get components from))
@@ -360,7 +365,7 @@
               (pp ["Creating channels for" from :-> srcs  :already-started (count (set @started)) :blocks])
 
 
-              (let [] ;do  ;when parents-ready? ;; does it matter? the channels are unique...
+              (let [] ;do  ;when parents-ready? ;; placeholder
                 (pp ["Starting block " from " with channel(s): " in-chans])
                ; (Thread/sleep 1000) ;; just for debugging
                 (swap! started conj from)
@@ -376,6 +381,7 @@
     (ut/ppln {:resolved-paths-end-values res})
     res))
 
+;;for development via "lein repl" etc
 ;(web/start!)
 ;(web/stop!)
 ;(flow looping-net {} testatom) ;; return atom, requires a :done

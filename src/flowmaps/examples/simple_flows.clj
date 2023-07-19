@@ -16,53 +16,19 @@
                                [:comp3 :adder-one/in]
                                [:adder-one :add-one]
                                [:adder :simple-plus-10]]
-                 :canvas {:adder-one {:x 732 :y 764 :h 255 :w 240}
-                          :add-one {:x 1123 :y 785 :h 199 :w 280}
-                          :adder-one/in {:x 430 :y 760 :h 255 :w 240}
-                          :comp2 {:x 175 :y 434 :h 147 :w 238}
-                          :comp3 {:x 136 :y 791 :h 203 :w 251}
-                          :adder/in1 {:x 486 :y 160 :h 187 :w 244}
-                          :comp1 {:x 198 :y 168 :h 146 :w 216}
-                          :adder {:x 862 :y 307 :h 225 :w 278}
-                          :simple-plus-10 {:x 1255 :y 327 :h 194 :w 307}
-                          :adder/in2 {:x 490 :y 426 :h 183 :w 239}}})
-
-(def network1 {:components {:comp0 12 ;(fn [] @starter) ;12 ;#(rando %) ;12
-                           ;:done :done
-                            :comp1 {:fn #(+ % 1)
-                                    :x 105 :y 105
-                                    :w 180 :h 120}
-                            :comp2 #(- % 10)
-                            :comp3 #(+ % 1)
-                            :comp4 #(+ % 10)
-                            :comp8 #(+ % 1)
-                            :multi #(let [x (* % 2)]
-                                      (if (> x 1000) :done x))
-                            :comp13 #(+ % 100)
-                            :comp55 #(/ % 2.2)
-                            :comp10 45
-                            :sleep #(do (Thread/sleep 2500) %) ;; sleep and then pass
-                            :comp11 #(+ % 10)
-                            :comp12 #(- % 1)}
-               :connections [[:comp0 :comp1]
-                             [:comp10 :comp8] ;; future
-                             [:comp8 :done]
-                             [:comp1 :comp2]
-                             [:comp2 :comp3]
-                             [:comp3 :comp4]
-                             [:comp2 :comp11]
-                             [:comp11 :comp12]
-                             [:comp4 :multi]
-                             [:multi :sleep]
-                             [:sleep :comp55]
-                            ;[:sleep :comp1] ;; recur loop start
-                            ;[:comp12 :multi]
-                             [:comp12 :comp13]
-                            ;[:comp13 :done]
-                             ]})
+                 :canvas {:adder-one {:x 1009 :y 765 :h 207 :w 297}
+                          :add-one {:x 1400 :y 754 :h 247 :w 440}
+                          :adder-one/in {:x 650 :y 746 :h 255 :w 240}
+                          :comp2 {:x 249 :y 423 :h 142 :w 155}
+                          :comp3 {:x 283 :y 771 :h 203 :w 251}
+                          :adder/in1 {:x 486 :y 160 :h 192 :w 242}
+                          :comp1 {:x 252 :y 204 :h 127 :w 148}
+                          :adder {:x 887 :y 317 :h 207 :w 198}
+                          :simple-plus-10 {:x 1189 :y 307 :h 224 :w 239}
+                          :adder/in2 {:x 490 :y 426 :h 201 :w 244}}})
 
 (def looping-net {:components {:comp1 10
-                               :comp2 20
+                               :comp2 20.1
                                :comp3 [133 45]
                                :tester '(fn [x] (+ 8 x))
                                :simple-plus-10 {:fn #(+ 10 %)}
@@ -75,8 +41,9 @@
                                                   :align :center :justify :center
                                                   :padding "10px"
                                                   :style {:color "#50a97855"
+                                                          :font-family "Sansita Swashed"
                                                           :font-weight 700
-                                                          :font-size "100px"}])}
+                                                          :font-size "110px"}])}
                                :conjer {:fn (fn [x]
                                               (defonce vv (atom []))
                                               (do (swap! vv conj x) @vv))
@@ -84,8 +51,8 @@
                                                 [:vega-lite {:data {:values (map-indexed (fn [index value]
                                                                                            {:index index
                                                                                             :value value}) x)}
-                                                             :mark {:type "bar"
-                                                                    :color "#60a9eb"}
+                                                             :mark {:type "area"
+                                                                    :color "#60a9eb66"}
                                                              :encoding {:x {:field "index" :type "ordinal"
                                                                             :title "index of conj pass"
                                                                             :axis {:labelColor "#ffffff77"
@@ -113,14 +80,20 @@
                                                                       :view {:stroke "#00000000"}}} {:actions false}])}
                                :add-one4 {:fn #(do (Thread/sleep 120) (+ 45 %))
                                           :cond {:condicane2 #(> % 800)}}
-                               :display-val {:fn (fn [x] x)
-                                             :view (fn [x]
-                                                     [:re-com/box :child (str x)
-                                                      :align :center :justify :center
-                                                      :padding "10px"
-                                                      :style {:color "#D7B4F3"
-                                                              :font-weight 700
-                                                              :font-size "80px"}])}
+                            ;;    :display-val {:fn (fn [x] x)
+                            ;;                  :view (fn [x]
+                            ;;                          [:re-com/box :child (str x)
+                            ;;                           :align :center :justify :center
+                            ;;                           :padding "10px"
+                            ;;                           :style {:color "#D7B4F3"
+                            ;;                                   :font-weight 700
+                            ;;                                   :font-size "80px"}])}
+                               :display-val {:fn (fn [x] {:recent-val x
+                                                          :test-map? true
+                                                          :random-int (rand-int 123)
+                                                          :vec [true false 1 3 4 4.234234 "bang!"]
+                                                          ;:random-str (str "omg-" (rand-int 123) "!")
+                                                          })}
                                :whoops {:fn #(str % ". YES.")}
                                :condicane {:fn #(str % " condicane!")}
                                :condicane2 {:fn #(str "FINAL VAL: " % " DONE")}
@@ -154,5 +127,5 @@
                            :add-one2 {:x 198 :y 1181 :h 255 :w 240}
                            :simple-plus-10 {:x 1199 :y 315 :h 255 :w 240}
                            :add-one3 {:x 596 :y 1196 :h 255 :w 240}
-                           :display-val {:x 771 :y 699 :h 179 :w 320}
+                           :display-val {:x 776 :y 600 :h 509 :w 358} ;{:x 771 :y 699 :h 179 :w 320}
                            :adder/in2 {:x 430 :y 430 :h 255 :w 240}}})
