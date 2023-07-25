@@ -44,7 +44,7 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 
 ![rabbit web ui](https://app.rabbitremix.com/gh-sample1.png)
 
-Contains a multi-input block, a single-input but explicity defined block, a fn only block, and some static values.
+Contains a multi-input block, a single-input but explicitly defined block, a fn only block, and some static values.
 
 Simple sample usage:
 
@@ -311,7 +311,7 @@ This is a great way to interact with the flow once it's been booted up. The chan
 - **path / track**
     - Sometimes used to refer to a set of blocks and channels together. i.e. "branching path", "looping path". A track can also be a segment of the flow that is unconnected to the larger flow and runs it's blocks independently. 
 - **sub-flow**
-    - an entire flow that gets executed as a block (not implemented yet! but important to understand, conecptually)
+    - an entire flow that gets executed as a block (not implemented yet! but important to understand, conceptually)
 
 
 
@@ -338,7 +338,7 @@ This is a great way to interact with the flow once it's been booted up. The chan
 - rabbit-ui "block assembly". 
     - The ability to (given a set of starting block defs) use the UI to drag in blocks, connect them, alter their values, test the block functions (disconnectedly with arbitrary values if need be), and then copy-pasta that finished flow-map back to your application
         - *I say copy-pasta back because that way YOU are in control instead of me having some other system of persisted DB data that you need to contend with. Some optional feature like that may exist in the future (persistent flow-db w time-travel, etc), but the **simple way**, I think, is **always** just giving you the flow "source" to re-use as you see fit.
-- rendering multi "input ports" differently? Currently rabbit shows them as their own blocks being injested - which is the easiest way to view and understand them, but conceptually they are just child nodes of the parent block and not their own entities... TBD
+- rendering multi "input ports" differently? Currently rabbit shows them as their own blocks being ingested - which is the easiest way to view and understand them, but conceptually they are just child nodes of the parent block and not their own entities... TBD
 - (optional) built-in visualization of block fn spyscope execution data? TBD
 - better ergonomics of the flow-map itself, just things that make it less verbose and slightly more flexible - reduce complexity, etc.
     - instead of having a static block defined as :my-input 15 - and then having a connection of [:my-input :my-fn-starts] why not just have a connection of [15 :my-fn-starts] and let the system create the implied :static-value-1 block with a 15 in it...
