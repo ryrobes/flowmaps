@@ -27,6 +27,35 @@
                           :simple-plus-10 {:x 1189 :y 307 :h 224 :w 239}
                           :adder/in2 {:x 490 :y 426 :h 201 :w 244}}})
 
+;; just testing some odd stuff
+(def odd-even {:components {:int1 10
+                            :int2 21
+                            :adder {:fn +
+                                    :inputs [:in1 :in2]
+                                    :cond {:odd? #(odd? %) ;; 2 bool conditional dyn outs with no "real" output flow
+                                           :even? #(even? %)}}
+                            :odd? (fn [x] (when (odd? x) "odd!"))
+                            :even? (fn [x] (when (even? x) "even!"))
+                            :display-val {:fn (fn [x] x)
+                                          :view (fn [x] [:re-com/box
+                                                         :align :center :justify :center
+                                                         :style {:font-size "105px"
+                                                                 :color "orange"
+                                                                 :font-family "Sansita Swashed"}
+                                                         :child (str x)])}}
+               :connections [[:int1 :adder/in1]
+                             [:int2 :adder/in2]
+                             [:odd? :display-val]
+                             [:even? :display-val]]
+               :canvas {:int1 {:x 100 :y 100 :h 255 :w 240}
+                        :adder/in1 {:x 430 :y 100 :h 255 :w 240}
+                        :int2 {:x 62 :y 455 :h 255 :w 240}
+                        :adder/in2 {:x 418 :y 461 :h 255 :w 240}
+                        :odd? {:x 1275 :y 262 :h 185 :w 260}
+                        :display-val {:x 1755 :y 345 :h 233 :w 329}
+                        :even? {:x 1273 :y 557 :h 176 :w 281}
+                        :adder {:x 834 :y 329 :h 255 :w 240}}})
+
 (def looping-net {:components {:comp1 10
                                :comp2 20.1
                                :comp3 [133 45]
@@ -51,7 +80,7 @@
                                                 [:vega-lite {:data {:values (map-indexed (fn [index value]
                                                                                            {:index index
                                                                                             :value value}) x)}
-                                                             :mark {:type "area"
+                                                             :mark {:type "bar"
                                                                     :color "#60a9eb66"}
                                                              :encoding {:x {:field "index" :type "ordinal"
                                                                             :title "index of conj pass"
@@ -78,7 +107,8 @@
                                                              :config {:style {"guide-label" {:fill "#ffffff77"}
                                                                               "guide-title" {:fill "#ffffff77"}}
                                                                       :view {:stroke "#00000000"}}} {:actions false}])}
-                               :add-one4 {:fn #(do (Thread/sleep 120) (+ 45 %))
+                               :add-one4 {:fn #(do ;; (Thread/sleep 120) 
+                                                   (+ 45 %))
                                           :cond {:condicane2 #(> % 800)}}
                             ;;    :display-val {:fn (fn [x] x)
                             ;;                  :view (fn [x]

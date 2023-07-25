@@ -1,4 +1,4 @@
-(defproject com.ryrobes/flowmaps "0.1.1-SNAPSHOT"
+(defproject com.ryrobes/flowmaps "0.2-SNAPSHOT"
   :description "FlowMaps: Flow Based Programming Micro-Framework for Clojure"
   :url "https://github.com/ryrobes/flowmaps"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
@@ -13,7 +13,7 @@
                  ;[clojure-term-colors "0.1.0"]
                  ;[org.clojars.rutledgepaulv/websocket-layer "0.1.10"]
                  [com.fasterxml.jackson.core/jackson-core "2.14.0-rc1"] ;; for websocket-layer
-                ; [spyscope "0.1.6"]
+                 ;[spyscope "0.1.6"]
                  [org.clojars.rutledgepaulv/websocket-layer "0.1.10" ;; exclusions recommended by `lein deps :tree`
                   :exclusions [joda-time com.cognitect/transit-java org.clojure/core.memoize
                                clj-time com.cognitect/transit-clj org.clojure/tools.analyzer

@@ -32,7 +32,6 @@
 (defonce websocket-server (jetty/run-jetty #'web-handler ring-options))
 
 ;;; super simple pedestal cfg for serving static SPA re-frame root...
-(defn home-page [_] (ring-resp/response "Hello World! Home!"))
 (defn static-root [_] (ring-resp/content-type (ring-resp/resource-response "index.html" {:root "public"}) "text/html"))
 (def common-interceptors [(body-params/body-params) http/html-body])
 
@@ -57,22 +56,18 @@
 
 (defn create-web-server! []
   (ut/ppln [:*web (format "starting web ui @ http://localhost:%d" 8888) "🐇" ])
-  (reset! web-server
-          (future (http/start runnable-service))))
+  (reset! web-server (future (http/start runnable-service))))
 
 (defn destroy-web-server! []
   (ut/ppln [:*web (format "stopping web server @ %d" 8888)])
-  (reset! web-server
-          nil))
+  (reset! web-server nil))
 
-(defn start! []
-  (try (do
-         ;(ut/ppln [:*websocket (format "starting websocket server @ %d" 3000)])
-         (.start websocket-server)
-         (create-web-server!)
-         (reset! websocket? true)) (catch Exception e (println e))))
+(defn start! [] ;; start the web server and websocket server
+  (.start websocket-server)
+  (create-web-server!)
+  (reset! websocket? true))
 
-(defn stop! []
+(defn stop! [] ;; stop the web server and websocket server
   (ut/ppln [:*websocket (format "stopping websocket server @ %d" 3000)])
   (.stop websocket-server)
   (destroy-web-server!)
@@ -80,7 +75,7 @@
 
 (def queue-atom (atom clojure.lang.PersistentQueue/EMPTY))
 
-(defmethod wl/handle-subscription :external-editing [{:keys [kind client-id]}]
+(defmethod wl/handle-subscription :external-editing [{:keys [kind client-id]}] ;; default subscription server->client push "queue"...
   (let [results (async/chan)]
     (async/go-loop []
       (async/<! (async/timeout 500)) ;; 600-800 seems ideal
@@ -102,32 +97,39 @@
 ;;         (recur)))
 ;;     results))
 
-(defmethod wl/handle-request :channel-gantt-data [_]
-  [[:channel-history] (vec (for [{:keys [channel start end path data-type value]} @db/channel-history
-                                 :let [endv (+ end 100)]] ;; 
-                             {:channel (str channel)
-                              :path (str path)
-                              :data-type data-type
-                              :value value
-                              :raw-end endv
-                              :raw-start start
-                              :start (ut/ms-to-iso8601 start)
-                              :end (ut/ms-to-iso8601 endv)}))])
+(defmethod wl/handle-request :channel-gantt-data [{:keys [flow-id]}] ;; channel-history data for flow-id X, UI used in multiple ways 
+  (let [data (vec (for [{:keys [channel start end path data-type value]} (get @db/channel-history flow-id)
+                        :let [endv (if (= start end) (+ end 2) end)]] ;; temp 2ms boost for gantt visibility...
+                    {:channel (str channel)
+                     :path (str path)
+                     :data-type data-type
+                     :value value
+                     :raw-end endv
+                     :raw-start start
+                     :start (ut/ms-to-iso8601 start)
+                     :end (ut/ms-to-iso8601 endv)}))]
+    (when (not (empty? data)) ;; don't want to overwrite UI w []
+      [flow-id [flow-id :channel-history] data])))
 
-(defmethod wl/handle-request :get-network-map [_]
-  [[:network-map] @db/working-data])
+(defmethod wl/handle-request :get-network-map [{:keys [flow-id]}] ;; working flow-map for flow-id X
+  [flow-id [flow-id :network-map] (get @db/working-data flow-id)])
 
-(defmethod wl/handle-request :push-channel-value [{:keys [kind channel-name value]}]
+(defmethod wl/handle-request :get-waffle-data [_] ;; for the waffle chart "airflow-esque" modal
+  (let [waffle-data (into {} (for [[flow-id wv] @db/waffle-data]
+                               {flow-id (vec (sort-by :start wv))}))]
+    [nil [:waffles] waffle-data]))
+
+(defmethod wl/handle-request :push-channel-value [{:keys [kind channel-name flow-id value]}] ;; ui trying to push specific channel value
   (do (ut/ppln [:incoming-channel-push kind channel-name value])
-    (async/put! (get @db/channels-atom channel-name) {:sender :webpush :value value})
-    [[:pushed channel-name] value]))
+    (async/put! (get-in @db/channels-atom [flow-id channel-name]) {:sender (last channel-name) :value value})
+    [[:pushed flow-id channel-name] value]))
 
-(defn push [keypath values & [ts]]
-  (let [bd (try (get-in @db/block-defs [(nth keypath 1)]) (catch Exception _ nil))]
-    (swap!
-   ;(rand-nth [queue-atom-alt queue-atom])
-     queue-atom
-     conj [keypath values ts (str bd)])))
-
-;; (defn push-alt [keypath values]
-;;   (swap! queue-atom-alt conj [keypath values]))
+(defn push! [flow-id keypath values & [ts tse]] ;; for default subscription queue usage (soon deprecated due to channel-history?)
+  (let [bd (try (get-in @db/block-defs [flow-id (nth keypath 2)]) (catch Exception _ nil))
+        tse (when tse (if (= ts tse) (+ tse 2) tse))] ;; add 2 ms for viz purposes! TODO document
+    (when (and ts bd) (swap! db/waffle-data assoc flow-id (conj (get @db/waffle-data flow-id) 
+                                                                {:name (str (nth keypath 2)) :type (ut/data-typer (get values :v)) :start ts :end tse 
+                                                                 :number (count (filter #(= (get % :name) (str (nth keypath 2))) (get @db/waffle-data flow-id)))
+                                                                 })))
+    (swap! db/web-push-history conj {:kp keypath :flow-id flow-id :values values :start ts :end tse :block-def bd :block-id (get keypath 2)})
+    (swap! queue-atom conj [flow-id keypath values ts tse (str bd)])))
