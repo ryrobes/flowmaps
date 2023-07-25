@@ -7,7 +7,7 @@ Construct and orchestrate stand-alone core.async pipelines with ease or use it t
  ![example workflow](https://github.com/ryrobes/flowmaps/actions/workflows/clojure.yml/badge.svg)
 
 ![looping blocks and views](https://app.rabbitremix.com/gh-looped4.gif)
-![flow start page](https://app.rabbitremix.com/flow-start3.gif)
+![flow start page](https://app.rabbitremix.com/flow-start4.gif)
 
 Originally introduced by J. Paul Morrison in the 1970s, FBP (Flow Based Programming) is a programming approach that defines applications as networks of "black box" processes, which exchange data packets over predefined connections. These connections transmit this data via predefined input and output ports. FBP is inherently concurrent and promotes high levels of component reusability and separation of concerns.
 
