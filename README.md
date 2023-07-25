@@ -57,14 +57,11 @@ Simple sample usage:
 (def first-flow {:components {:comp1 10 ;; static "starter value"
                               :comp2 20 ;; static "starter value"
                               :simple-plus-10 #(+ 10 %) ;; wrapping useful for single input blocks
-                              :add-one #(+ 1 %)         ;; easy to point where the flowing val goes
-                              :adder-one {:fn #(apply + %)
-                                          :inputs [:in]}
                               :adder {:fn + ;; multi input uses "apply" after materializing inputs
                                       :inputs [:in1 :in2]}}
-                 :connections [[:comp1 :adder/in1]
+                 :connections [[:comp1 :adder/in1] ;; specify the ports directly
                                [:comp2 :adder/in2]
-                               [:adder :simple-plus-10]]})
+                               [:adder :simple-plus-10]]}) ;; but use the whole block as output
 
 (fweb/start!) ;; starts up the rabbit-ui viewer at http://localhost:8888/ 
 (fm/flow first-flow) ;; starts the flow, look upon ye rabbit and rejoice!
