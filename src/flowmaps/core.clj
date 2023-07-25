@@ -395,11 +395,11 @@
              res)})))
 
 ;;for development via "lein repl" etc
-(web/start!)
+;(web/start!)
 ;(web/stop!)
 ;(flow looping-net {} testatom) ;; return atom, requires a :done
 ;(flow looping-net {} (async/chan 1)) ;; return channel, requires a :done
 ;(flow my-network {} nil {:comp1 4545 :comp2 2323}) ;; override subflow values
 ;(flow fex/looping-net)
 ;(flow fex/my-network)
-(flow fex/odd-even)
+;(flow fex/odd-even)
