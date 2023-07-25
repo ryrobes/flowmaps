@@ -263,6 +263,10 @@ When the web ui is first booted up via...
 ```
 ...you will see a blank canvas that won't show anything until a flow is run. Obviously this data is not pushed out unless rabbit is running in your REPL or application.
 
+![rabbit web ui primer 2](https://app.rabbitremix.com/flow-start1.png)
+
+Once some data starts coming in, you will see a small waffle chart of each flow that has run/is running in your repl/application! Click on a flow-id (randomly generated, or hardcoded with opts :flow-id "whatever") to select it, and click on the canvas to dismiss this "flow start" screen.
+
 ![rabbit web ui primer 2](https://app.rabbitremix.com/gh-primer2.png)
 
 Hit the *spacebar* to toggle the channel sidebar panel.
