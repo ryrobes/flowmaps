@@ -14,16 +14,24 @@ Construct and orchestrate stand-alone core.async pipelines with ease or use it t
 
 ![looping blocks and views](https://app.rabbitremix.com/gh-looped4.gif)
 
-### Rebooting flow-based programming in Clojure by enabling effortless orchestration of core.async pipelines & intricate application flows. Craft flows in a simple bullshit-free map structure, watch them come to life in a time-traveling "Rabbit" canvas UI. Debug, visualize, and experiment in real-time, helping to ensure observability and understanding anywhere you need async chains.
+Rebooting flow-based programming in Clojure by enabling effortless orchestration of core.async pipelines & intricate application flows. 
+  * Craft flows in a simple bullshit-free map structure, watch them come to life in a time-traveling "Rabbit" canvas UI. 
+  * Debug, visualize, and experiment in real-time, helping to ensure observability and understanding anywhere you need async chains.
 
 
-* [Core "flow runner" features](#core-flow-runner-features)
-* ["Rabbit" UI debugger features (optional)](#rabbit-front-end-debugger-features-optional)
-* [Some examples](#some-examples)
+
+---
+
+
+* Features
+    * [Core "flow runner"](#core-flow-runner-features)
+    * ["Rabbit" UI debugger (optional)](#rabbit-front-end-debugger-features-optional)
+* [Examples](#some-examples)
     * [Basic flow example](#basic-flow-example)
     * [Medium complexity example](#medium-complexity-example)
-* ["flow" function](#flow-function-options)
-* ["flow-results" function](#flow-results-function)
+* Function docs
+    * ["flow" function](#flow-function-options)
+    * ["flow-results" function](#flow-results-function)
 * [Quick Rabbit UI primer](#quick-rabbit-ui-primer)
 * [TODO / ideas](#todo--ideas-as-of-71723-in-no-particular-order)
 
