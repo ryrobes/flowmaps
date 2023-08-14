@@ -54,7 +54,8 @@ Simple sample usage:
             [flowmaps.web :as fweb])
   (:gen-class))
 
-(def first-flow {:components {:comp1 10 ;; static "starter value"
+(def first-flow {:description "my first flow!" ;; optional, can be helpful when working w multiple flows in the UI
+                 :components {:comp1 10 ;; static "starter value"
                               :comp2 20 ;; static "starter value"
                               :simple-plus-10 #(+ 10 %) ;; wrapping useful for single input blocks
                               :adder {:fn + ;; multi input uses "apply" after materializing inputs
@@ -162,6 +163,10 @@ A slight ramp up in complexity from the above flow. Contains a loop that exists 
                                 [:add-one :add-one2]
                                 [:add-one2 :add-one3]
                                 [:add-one3 :add-one4]]
+                  :colors :Spectral ;; optional, can use Colorbrewer scales to change the channel color scale in the UI
+                  ;; :YlGn :Spectral :Paired :Set2 :PuBu :GnBu :RdGy :Purples :YlOrBr :Pastel2 :Set3 :Greys :Greens 
+                  ;; :BrBG :PuOr :BuPu :RdYlGn :Reds :Accent :PRGn :Dark2 :PiYG :OrRd :PuBuGn :YlOrRd :BuGn :Oranges 
+                  ;; :RdYlBu :Blues :PuRd :RdBu :RdPu :Pastel1 :YlGnBu :Set1
                   :canvas ;; used for rabbit placement. ignored otherwise.
                   {:conjer {:x 845 :y 891 :h 319 :w 428}
                    :whoops {:x 1482 :y 1318 :h 188 :w 310}

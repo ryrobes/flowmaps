@@ -2,6 +2,8 @@
   (:require [clojure.string :as cstr]
             [flowmaps.utility :as ut]
             [flowmaps.db :as db]
+            [flowmaps.rest :as rest]
+            [clojure.edn :as edn]
             [websocket-layer.core :as wl]
             [websocket-layer.network :as net]
             [clojure.core.async :as async]
@@ -35,7 +37,8 @@
 (defn static-root [_] (ring-resp/content-type (ring-resp/resource-response "index.html" {:root "public"}) "text/html"))
 (def common-interceptors [(body-params/body-params) http/html-body])
 
-(def routes #{["/" :get (conj common-interceptors `static-root)]})
+(def routes #{["/" :get (conj common-interceptors `static-root)]
+              ["/flow-value-push/:flow-id" :post (conj common-interceptors `rest/flow-value-push)]})
 
 (def service {:env :prod
               ::http/routes routes
@@ -97,17 +100,27 @@
 ;;         (recur)))
 ;;     results))
 
+(defn format-channel-history [flow-id]
+  (vec (for [{:keys [channel start end path data-type value dest dbgn type]}
+             (into (get @db/channel-history2 flow-id)
+                   (into (get @db/channel-history flow-id)
+                         (get @db/fn-history flow-id)))
+             :let [endv (if (= start end) (+ end 2) end)]] ;; 5ms boost for gantt visibility, update docs
+         (merge {:channel (str channel)
+                 :path (str path)
+                 :ms (- end start)
+                 :data-type data-type
+                 :value (ut/limited value)
+                 :type type
+                 :dest (str dest)
+                 :raw-end endv
+                 :raw-start start
+                 :start (ut/ms-to-iso8601 start)
+                 :end (ut/ms-to-iso8601 endv)}
+                (if dbgn {:dbgn dbgn} {})))))
+
 (defmethod wl/handle-request :channel-gantt-data [{:keys [flow-id]}] ;; channel-history data for flow-id X, UI used in multiple ways 
-  (let [data (vec (for [{:keys [channel start end path data-type value]} (get @db/channel-history flow-id)
-                        :let [endv (if (= start end) (+ end 2) end)]] ;; temp 2ms boost for gantt visibility...
-                    {:channel (str channel)
-                     :path (str path)
-                     :data-type data-type
-                     :value value
-                     :raw-end endv
-                     :raw-start start
-                     :start (ut/ms-to-iso8601 start)
-                     :end (ut/ms-to-iso8601 endv)}))]
+  (let [data (format-channel-history flow-id)]
     (when (not (empty? data)) ;; don't want to overwrite UI w []
       [flow-id [flow-id :channel-history] data])))
 
@@ -119,17 +132,21 @@
                                {flow-id (vec (sort-by :start wv))}))]
     [nil [:waffles] waffle-data]))
 
-(defmethod wl/handle-request :push-channel-value [{:keys [kind channel-name flow-id value]}] ;; ui trying to push specific channel value
-  (do (ut/ppln [:incoming-channel-push kind channel-name value])
-    (async/put! (get-in @db/channels-atom [flow-id channel-name]) {:sender (last channel-name) :value value})
-    [[:pushed flow-id channel-name] value]))
+(defmethod wl/handle-request :get-flow-maps [_]
+  [nil [:flow-maps] @db/working-data])
 
-(defn push! [flow-id keypath values & [ts tse]] ;; for default subscription queue usage (soon deprecated due to channel-history?)
-  (let [bd (try (get-in @db/block-defs [flow-id (nth keypath 2)]) (catch Exception _ nil))
-        tse (when tse (if (= ts tse) (+ tse 2) tse))] ;; add 2 ms for viz purposes! TODO document
-    (when (and ts bd) (swap! db/waffle-data assoc flow-id (conj (get @db/waffle-data flow-id) 
-                                                                {:name (str (nth keypath 2)) :type (ut/data-typer (get values :v)) :start ts :end tse 
-                                                                 :number (count (filter #(= (get % :name) (str (nth keypath 2))) (get @db/waffle-data flow-id)))
-                                                                 })))
-    (swap! db/web-push-history conj {:kp keypath :flow-id flow-id :values values :start ts :end tse :block-def bd :block-id (get keypath 2)})
-    (swap! queue-atom conj [flow-id keypath values ts tse (str bd)])))
+(defmethod wl/handle-request :get-block-dump [{:keys [flow-id]}] ;; entire model for the UI for a particular flow-id (dump instead of drip)
+  (let [channel-history (format-channel-history flow-id)
+        block-dump (merge (get @db/block-dump flow-id)
+                          {:channel-history channel-history})]
+    [flow-id [flow-id] block-dump]))
+
+(defmethod wl/handle-request :push-channel-value [{:keys [channels flow-id value]}] ;; ui trying to push specific channel value
+  (rest/push-channel-value channels flow-id value))
+
+;; (defmethod wl/handle-request :push-live-flow [{:keys [value]}] ;; live eval and send it
+;;   (let [evl (read-string value)
+;;         ost (with-out-str (read-string value))]
+;;     (ut/ppln [:incoming-live-flow value evl])
+;;     [:live-flow-return [:live-flow-return] {:return (pr-str evl)
+;;                                             :output (pr-str ost)}]))

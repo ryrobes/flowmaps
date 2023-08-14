@@ -19,6 +19,16 @@
     <link rel="icon" type="image/png" href="images/favicon.png">
 
     <style>
+
+
+::-webkit-scrollbar-corner {
+  background: rgba(0,0,0,0) !important;
+  background-color: rgba(0,0,0,0) !important;
+}
+
+
+::-webkit-scrollbar-corner {background-color: transparent;}
+
       ::-webkit-scrollbar-corner {
         background: rgba(0, 0, 0, 0) !important;
         background-color: rgba(0, 0, 0, 0) !important;
@@ -45,6 +55,8 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
+  border: none;
+  color: #c678dd;
   background-color: #c678dd;
   cursor: grab;
 }
@@ -53,6 +65,8 @@ input[type='range']::-moz-range-thumb {
   width: 10px;
   height: 150px;
   border-radius: 50%;
+  border: none;
+  color: #c678dd;
   background-color: #c678dd;
   cursor: grab;
 }
@@ -109,6 +123,17 @@ input[type='range']::-moz-range-track {
   animation-iteration-count: infinite;
 }
 
+.vl-tooltip {
+  font-family: Poppins, sans-serif;
+  background-color: #ffffff;
+  color: #000000;
+}
+
+.vl-tooltip td.key {
+  color: #000000;
+  font-weight: bold;
+}
+
 
 
 
@@ -116,6 +141,7 @@ input[type='range']::-moz-range-track {
 
   </head>
   <body>
+
     <noscript>
       flowmaps-ui is a JavaScript app. Please enable JavaScript to continue.
     </noscript>
