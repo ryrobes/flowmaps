@@ -1,3 +1,9 @@
+
+
+> “And what is the use of a book," thought Alice, "without pictures or conversation?”
+>
+> — *Lewis Carroll, Alice's Adventures in Wonderland*
+
 # flowmaps
 ## A "Flow Based Programming" *sequencer* for Clojure with interactive flow debugger & visualizer
 
@@ -7,7 +13,24 @@ Construct and orchestrate stand-alone core.async pipelines with ease or use it t
  ![example workflow](https://github.com/ryrobes/flowmaps/actions/workflows/clojure.yml/badge.svg)
 
 ![looping blocks and views](https://app.rabbitremix.com/gh-looped4.gif)
+
+### Rebooting flow-based programming in Clojure by enabling effortless orchestration of core.async pipelines & intricate application flows. Craft flows in a simple bullshit-free map structure, watch them come to life in a time-traveling "Rabbit" canvas UI. Debug, visualize, and experiment in real-time, helping to ensure observability and understanding anywhere you need async chains.
+
+
+* [Core "flow runner" features](#core-flow-runner-features)
+* ["Rabbit" UI debugger features (optional)](#rabbit-front-end-debugger-features-optional)
+* [Some examples](#some-examples)
+    * [Basic flow example](#basic-flow-example)
+    * [Medium complexity example](#medium-complexity-example)
+* ["flow" function](#flow-function-options)
+* ["flow-results" function](#flow-results-function)
+* [Quick Rabbit UI primer](#quick-rabbit-ui-primer)
+* [TODO / ideas](#todo--ideas-as-of-71723-in-no-particular-order)
+
 ![flow start page](https://app.rabbitremix.com/flow-start4.gif)
+
+
+# Flow Based Programming?
 
 Originally introduced by J. Paul Morrison in the 1970s, FBP (Flow Based Programming) is a programming approach that defines applications as networks of "black box" processes, which exchange data packets over predefined connections. These connections transmit this data via predefined input and output ports. FBP is inherently concurrent and promotes high levels of component reusability and separation of concerns.
 
@@ -17,24 +40,30 @@ While it's nomenclature may diverge from Morrison's FBP terminology to be more c
 
 Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and SEE how these flows are executed, their parallelism (if any), and more importantly - interactive experimentation and iterative development. One of the benefits of FBP is the ability for teams to better comprehend large complex systems as drawn out as boxes and lines - I wanted to provide a "live" version of that.
 
-# **I wanted to write core.async flows w/o a blindfold**
+# "I wanted to write core.async flows w/o a blindfold"
 
 
 ![rabbit web ui](https://app.rabbitremix.com/gh-sample2.png)
 
-## Back-end "flow runner" features
- - fully uses core.async channels for concurrency, etc
+## Core "flow runner" features
+ - built on Clojure's core.async channels for concurrency & performance
+    - channels can be written to and read by any other part of your program, flowmaps just coordinates them into "flowing chain" of reactive functions and channels with just some map keys
  - multi-input blocks (all inputs will wait automatically)
  - conditional pathing
- - a straightforward "map-based" interface
+ - a straightforward "map-based" interface for configuration
+ - each block and channel can optionally be read and written to via an HTTP REST endpoint
  - ability for a "result value" of the entire flow to "ship out" of the flow to an external channel or atom into the rest of your application
+ - flow> macro to turn a threading macro (->) shape into a starter flow-map
 
-## Front-end "rabbit-ui" features (optional) 
+## "Rabbit" front-end debugger features (optional) 
 - canvas based placement and arrangement to "see" your blocks (fns) and how they relate to each other via their connections (async channels)
 - watching the flow "play out" visually
 - "hijacking" channels to send arbitrary values to them and watch the resulting chain-reactions
 - optional block "views" (as in screenshot above), gives you the ability to write hiccup, re-com, and vega specs to render the values as they flow through the system - very useful in debugging or just monitoring your flow as it runs
 - simple gantt chart timeline to better understand flow parallelism
+- time scrubbing - go back in time and see previous values and how they "flowed"
+- interactive flow building - a small eval window can help you iterate on your flows without leaving the UI (WIP)
+- Linear run log
 
 
 

@@ -105,7 +105,7 @@
              (into (get @db/channel-history2 flow-id)
                    (into (get @db/channel-history flow-id)
                          (get @db/fn-history flow-id)))
-             :let [endv (if (= start end) (+ end 2) end)]] ;; 5ms boost for gantt visibility, update docs
+             :let [endv (if (= start end) (+ end 1) end)]] ;; 5ms boost for gantt visibility, update docs
          (merge {:channel (str channel)
                  :path (str path)
                  :ms (- end start)
