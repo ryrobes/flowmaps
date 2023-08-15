@@ -126,9 +126,10 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 
     * _each block represents a function, and it's color is based on it's output data type_
     * _(force a name with ```(fm/flow first-flow {:flow-id "papa-het"})``` )_
+
 * select the name to see the flow on the canvas
 
-        ![1rabbit web ui](https://app.rabbitremix.com/first-rabbit.png)
+    ![1rabbit web ui](https://app.rabbitremix.com/first-rabbit.png)
 
     * As you can see we started with 10, incremented to 11, added 10 - and ended up with 21
         * the bottom timeline shows what channels and what functions ran, and we can scrub the blue line across time to see what the values were at that particular time. It's not quite illuminating in this simple example, but you can see how in complex flows with loops and conditional pathways how useful this can be.
