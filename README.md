@@ -7,32 +7,39 @@
 # flowmaps
 ## A "Flow Based Programming" *sequencer* for Clojure with interactive flow debugger & visualizer
 
-Construct and orchestrate stand-alone core.async pipelines with ease or use it to encapsulate & manage complex 'flows' within your application.
-
 [![Clojars Project](https://img.shields.io/clojars/v/com.ryrobes/flowmaps.svg?include_prereleases)](https://clojars.org/com.ryrobes/flowmaps)
  ![example workflow](https://github.com/ryrobes/flowmaps/actions/workflows/clojure.yml/badge.svg)
 
 ![looping blocks and views](https://app.rabbitremix.com/gh-looped4.gif)
 
-Rebooting flow-based programming in Clojure by enabling effortless orchestration of core.async pipelines & intricate application flows. 
-  * Craft flows in a simple bullshit-free map structure, watch them come to life in a time-traveling "Rabbit" canvas UI. 
-  * Debug, visualize, and experiment in real-time, helping to ensure observability and understanding anywhere you need async chains.
+## Rebooting flow-based programming in Clojure by enabling effortless orchestration of core.async pipelines & intricate application flows. 
+  * ### Craft flows in a simple bullshit-free map structure, watch them come to life in a time-traveling "Rabbit" canvas UI. 
+  * ### Debug, visualize, and experiment in real-time, helping to ensure observability and understanding anywhere you need async chains.
 
 
 
 ---
 
 
-* Features
-    * [Core "flow runner"](#core-flow-runner-features)
-    * ["Rabbit" UI debugger (optional)](#rabbit-front-end-debugger-features-optional)
-* [Examples](#some-examples)
-    * [Basic flow example](#basic-flow-example)
-    * [Medium complexity example](#medium-complexity-example)
-* Function docs
-    * ["flow" function](#flow-function-options)
-    * ["flow-results" function](#flow-results-function)
-* [Quick Rabbit UI primer](#quick-rabbit-ui-primer)
+* [What is Flow Based Programming?](#flow-based-programming)
+
+* [Getting started (Start Here!)](#how-to-get-started)
+   * [from the REPL (w lein)](#from-the-repl-w-lein)
+   * [From the UI](#from-the-ui)
+
+* [Features](#core-flow-runner-features)
+    * [The Core "flow runner"](#core-flow-runner-features)
+    * ["Rabbit" Debugger / Visualizer Canvas (optional)](#rabbit-front-end-debugger-features-optional)
+
+* [Flow examples](#flow-examples)
+    * [Basic flow](#basic-flow)
+    * [Medium complexity](#medium-complexity)
+
+* Function documentation
+    * [_"flow"_ function options](#flow-function-options)
+    * [_"flow-results"_ function](#flow-results-function)
+    * [_"flow>"_ macro](#flow>-macro)
+
 * [TODO / ideas](#todo--ideas-as-of-71723-in-no-particular-order)
 
 ![flow start page](https://app.rabbitremix.com/flow-start4.gif)
@@ -420,6 +427,55 @@ Example:
               ([:start1 10] [:*/in1 {:port-in? true, :*/in1 10}] [:* 200] [:done 200])})}
 
 ```
+
+# "flow>" macro
+The flowmaps.core/flow> macro is a quick way to "bootstrap" a flow-map from a common "threading shape" (->) you see in Clojure.
+
+```clojure
+(flow> 10 #(* 2 %) #(- % 3) #(+ 10 %) inc inc dec (fn[x] (str x "!")))
+
+;; will return 
+{:components {:step7 #object
+                    [clojure.core$dec 0x2f8bfcf4
+                    "clojure.core$dec@2f8bfcf4"]
+            :step2 #object
+                    [clojure.core$eval27888$fn__27889 0x2fe0bfd7
+                    "clojure.core$eval27888$fn__27889@2fe0bfd7"]
+            :step4 #object
+                    [clojure.core$eval27888$fn__27891 0x5525a2ae
+                    "clojure.core$eval27888$fn__27891@5525a2ae"]
+            :step1 10
+            :step3 #object
+                    [clojure.core$eval27888$fn__27893 0x7f66eca3
+                    "clojure.core$eval27888$fn__27893@7f66eca3"]
+            :step5 #object
+                    [clojure.core$inc 0x219627cd
+                    "clojure.core$inc@219627cd"]
+            :step8 #object
+                    [clojure.core$eval27888$fn__27895 0x5bfe0d5
+                    "clojure.core$eval27888$fn__27895@5bfe0d5"]
+            :step6 #object
+                    [clojure.core$inc 0x219627cd
+                    "clojure.core$inc@219627cd"]}
+:connections [[:step1 :step2] [:step2 :step3] [:step3 :step4]
+            [:step4 :step5] [:step5 :step6] [:step6 :step7]
+            [:step7 :step8]]}
+
+```
+
+![rabbit web ui primer 1](https://app.rabbitremix.com/macro.png) 
+
+While obviously not ideal for many circumstances (since the functions get auto-compiled), it can be useful creating a base template that then gets edited into later (replacing the compiler refs with original functions)
+
+```clojure
+;; also if can be handy for quick example flows 
+(flow (flow> 10 #(* 2 %) #(- % 3) #(+ 10 %) inc inc dec (fn[x] (str x "!")))) 
+
+;; and teaching people how to "map" flowmaps graph model to something already understood like a ->
+
+```
+
+
 
 # Quick Rabbit UI primer
 
