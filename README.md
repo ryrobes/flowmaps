@@ -17,7 +17,6 @@
   * ### Debug, visualize, and experiment in real-time, helping to ensure observability and understanding anywhere you need async chains.
 
 
-
 ---
 
 
@@ -549,12 +548,12 @@ This is a great way to interact with the flow once it's been booted up. The chan
 
 
 ## TODO / ideas (as of 7/17/23, in no particular order)
-- spec for flow-map data sent to the *flow* fn with useful errors
-- :flow-id for each run to allow concurrent flows w/o clashing (will also fix a closing channel bug)
-    - rabbit-ui will need to allow the user to choose which "loaded / running flow" to render and interact with (see "sub-flows" below)
+- ~~spec for flow-map data sent to the *flow* fn with useful errors~~
+- ~~:flow-id for each run to allow concurrent flows w/o clashing (will also fix a closing channel bug)~~
+    ~~- rabbit-ui will need to allow the user to choose which "loaded / running flow" to render and interact with (see "sub-flows" below)~~
 - :cljs-view option for ClojureScript views that get compiled on the front-end instead of the back end. Opens up some more interactivity options for view blocks.
 - subflows! essentially a block that is an entire other flow with some "input overrides" that flow in from the "parent flow". Almost like a visual function that can be examined using the rabbit-ui as it's own flow. (sub)flow-maps as blocks opens up a really interesting world of re-usability...
-- flowmaps.io as an open "library" of block, flow, function snippets to add to your flows or play around with (actual way it will work TBD)
+- flowmaps.io as an open "library" of blocks, flow, function snippets to add to your flows or play around with (actual way it will work TBD)
     - this will allow me to focus this repo on the core backend library instead of shoehorning all kinds of rando stuff in there that most people won't use, although I'm def not against the creation of "core primitive" block types for a basic set of CLJ fns shorthand that ships out of the box (perhaps even going as far as packaging SQL, JDBC, etc). TBD!
     - some simple examples
         - "Philips Hue block" to change your lights - read their statuses
@@ -570,8 +569,8 @@ This is a great way to interact with the flow once it's been booted up. The chan
 - (optional) built-in visualization of block fn spyscope execution data? TBD
 - better ergonomics of the flow-map itself, just things that make it less verbose and slightly more flexible - reduce complexity, etc.
     - instead of having a static block defined as :my-input 15 - and then having a connection of [:my-input :my-fn-starts] why not just have a connection of [15 :my-fn-starts] and let the system create the implied :static-value-1 block with a 15 in it...
-- render rowsets (vectors/lists of uniform maps) in a nice virtual table / grid component instead of nested map blocks in the UI
-- better visualization of "tracks" - i.e. natural pathfinding of connected blocks
+- ~~render rowsets (vectors/lists of uniform maps) in a nice virtual table / grid component instead of nested map blocks in the UI~~
+- ~~better visualization of "tracks" - i.e. natural pathfinding of connected blocks~~
 - a better pathfinding / coord generating layout algo. When Rabbit loads up a flow without any :canvas metadata it will attempt to lay the blocks out so they don't overlap and are somewhat grokable - but it is FAR from the ideal left->right spaced out layout that we want.
 
 ## License
