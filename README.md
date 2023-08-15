@@ -59,25 +59,7 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 
 ![rabbit web ui](https://app.rabbitremix.com/gh-sample2.png)
 
-## Core "flow runner" features
- - built on Clojure's core.async channels for concurrency & performance
-    - channels can be written to and read by any other part of your program, flowmaps just coordinates them into "flowing chain" of reactive functions and channels with just some map keys
- - multi-input blocks (all inputs will wait automatically)
- - conditional pathing
- - a straightforward "map-based" interface for configuration
- - each block and channel can optionally be read and written to via an HTTP REST endpoint
- - ability for a "result value" of the entire flow to "ship out" of the flow to an external channel or atom into the rest of your application
- - flow> macro to turn a threading macro (->) shape into a starter flow-map
 
-## "Rabbit" front-end debugger features (optional) 
-- canvas based placement and arrangement to "see" your blocks (fns) and how they relate to each other via their connections (async channels)
-- watching the flow "play out" visually
-- "hijacking" channels to send arbitrary values to them and watch the resulting chain-reactions
-- optional block "views" (as in screenshot above), gives you the ability to write hiccup, re-com, and vega specs to render the values as they flow through the system - very useful in debugging or just monitoring your flow as it runs
-- simple gantt chart timeline to better understand flow parallelism
-- time scrubbing - go back in time and see previous values and how they "flowed"
-- interactive flow building - a small eval window can help you iterate on your flows without leaving the UI (WIP)
-- Linear run log
 
 # How to get started
 
@@ -183,7 +165,7 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 
         ```
 
-    * If we go back to our Rabbit web, we can see that since the web server was running all this time - these flows have been visualized as well.
+    * If we go back to our Rabbit web, we can see that since the web server was running all this time - these flows have actually been tracked and  visualized as well.
 
         ![1rabbit web ui](https://app.rabbitremix.com/rabbit-after.png)
 
@@ -209,6 +191,30 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 
 ## From the UI
 TODO
+
+---
+
+# Features List (boring)
+
+## Core "flow runner" features
+ - built on Clojure's core.async channels for concurrency & performance
+    - channels can be written to and read by any other part of your program, flowmaps just coordinates them into "flowing chain" of reactive functions and channels with just some map keys
+ - multi-input blocks (all inputs will wait automatically)
+ - conditional pathing
+ - a straightforward "map-based" interface for configuration
+ - each block and channel can optionally be read and written to via an HTTP REST endpoint
+ - ability for a "result value" of the entire flow to "ship out" of the flow to an external channel or atom into the rest of your application
+ - flow> macro to turn a threading macro (->) shape into a starter flow-map
+
+## "Rabbit" front-end debugger features (optional) 
+- canvas based placement and arrangement to "see" your blocks (fns) and how they relate to each other via their connections (async channels)
+- watching the flow "play out" visually
+- "hijacking" channels to send arbitrary values to them and watch the resulting chain-reactions
+- optional block "views" (as in screenshot above), gives you the ability to write hiccup, re-com, and vega specs to render the values as they flow through the system - very useful in debugging or just monitoring your flow as it runs
+- simple gantt chart timeline to better understand flow parallelism
+- time scrubbing - go back in time and see previous values and how they "flowed"
+- interactive flow building - a small eval window can help you iterate on your flows without leaving the UI (WIP)
+- Linear run log
 
 
 ## Flow examples
@@ -503,7 +509,7 @@ Value explorer - double-clicking on a block's titlebar will open up a side panel
 
 ![rabbit web ui primer 5](https://app.rabbitremix.com/gh-primer5.png)
 
-Double clicking on the channel pill on the left sidebar to expand it. It will contain:
+Right clicking on the channel pill on the left sidebar to expand it. It will contain:
 - a REPL command to push a value to that channel (copy-pasta all the way!)
 - a set of the last 4 values that channel has "seen" (click on one of them to RESEND that value to the channel)
 - a text box to send an *arbitrary* value to this channel
