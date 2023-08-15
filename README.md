@@ -73,11 +73,140 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 - interactive flow building - a small eval window can help you iterate on your flows without leaving the UI (WIP)
 - Linear run log
 
+# How to get started
+
+## from the REPL (w lein)
+* Add flowmaps to your deps
+    * ``` [com.ryrobes/flowmaps "0.31-SNAPSHOT"] ```
+* Boot up your REPL
+    * ``` lein repl ```
+* Include flowmaps.core and flowmaps.web
+    ```clojure 
+    (require '[flowmaps.core :as fm]
+             '[flowmaps.web :as fweb]) 
+    ```
+* Start up the Rabbit web-server and web-sockets 
+    * (only needed for dev / prod can be headless)
+    ```clojure
+    (fweb/start!) ;; starts up the rabbit-ui viewer at http://localhost:8888/ 
+    ```    
+* Open up the URL - but just leave it for now - http://localhost:8888/ 
+
+![rabbit web ui](https://app.rabbitremix.com/ready-to-flow.png)
+
+* Define a simple flow map
+    ```clojure
+    (def first-flow 
+       {:components {:starting 10                 ;; static value to start the flow
+                     :add-one inc                 ;; function 1
+                     :add-ten (fn [x] (+ 10 x))}  ;; function 2 (reg anonymous fn)
+        :connections [[:starting :add-one]        ;; order of flow operations
+                      [:add-one :add-ten]         ;; (which will become channels)
+                      [:add-ten :done]]})         ;; done just signals completion
+    ```
+* Start the flow
+    ```clojure
+    (fm/flow first-flow)
+    ```
+    * this will 
+        * create the channels required
+        * seed the starting value(s)
+        * values pass through functions, create new values for the next channel, etc
+        * everything flows downstream to the end
+
+    * you will see lots of debug output from the various channels created and values flow through them. 
+        * _(they can be silenced with ```(fm/flow first-flow {:debug? false})``` )_
+
+        ![rabbit web ui](https://app.rabbitremix.com/running.png)
+
+* go back to Rabbit and select the running flow
+    * it will have a randomly generated name
+
+        ![rabbit web ui](https://app.rabbitremix.com/flow-channels.png)
+
+    * _each block represents a function, and it's color is based on it's output data type_
+    * _(force a name with ```(fm/flow first-flow {:flow-id "papa-het"})``` )_
+* select the name to see the flow on the canvas
+
+        ![1rabbit web ui](https://app.rabbitremix.com/first-rabbit.png)
+
+    * As you can see we started with 10, incremented to 11, added 10 - and ended up with 21
+        * the bottom timeline shows what channels and what functions ran, and we can scrub the blue line across time to see what the values were at that particular time. It's not quite illuminating in this simple example, but you can see how in complex flows with loops and conditional pathways how useful this can be.
+
+    * Let's send another value - we COULD change the starting value and re-run the flow, essentially creating a new flow - but since we have Rabbit open and the channels are all still open - the flow is still "running" since the channels will react to a new value just like it did for our 10 we sent.
+    * click on the 10 in the first block and change it to some other integer or float (remember we are applying math, so a string would error)
+
+        ![1rabbit web ui](https://app.rabbitremix.com/first-rabbit2.png)
+
+    * you can see that it just processed our new value - also notice that 2 bars have appeared above the timeline
+        * these are "time segments" of flow execution. Click back on the first one and you'll see our first run and the values in the blocks will change accordingly
+
+    * back to the REPL - let's run it again more like you would in a production / embedded scenario
+        * Since flowmaps is based on Clojure's core.async we can't directly get a value back since it's all async execution.
+        * but we can provide an atom or ANOTHER channel (or the start of another flow) to pass the final value to when the flow reaches the pseudo ```:done``` block (notice that :done did not render in Rabbit, since it's not a "real" block, just a signal or sorts)
+        * to keep this example simple, let's just use an atom
+        ```clojure
+        (def my-results (atom nil)) ;; atom to hold the result
+
+        (fm/flow first-flow         ;; run a new version of the flow
+          {:debug? false}           ;; no console output
+           my-results)              ;; our atom
+
+        @my-results                 ;; ==> 21         
+        ```
+
+    * Neat. but what if I want to send other values instead? I don't really want to write new flows for each one.
+        * No problem, we can just "override" our starting block
+
+        ```clojure
+        (fm/flow first-flow 
+        {:debug? false} 
+         my-results 
+        {:starting 42069}) ;; a map with block names and override values
+
+        @my-results        ;; ==> 42080
+        ```
+        * In fact, you can override any block..
+
+        ```clojure
+        (fm/flow first-flow {:debug? false} my-results 
+        {:starting 42069 :add-ten #(* % 0.33)})
+
+        ;; ==> 13883.1
+
+        ```
+
+    * If we go back to our Rabbit web, we can see that since the web server was running all this time - these flows have been visualized as well.
+
+        ![1rabbit web ui](https://app.rabbitremix.com/rabbit-after.png)
 
 
-## Some examples
+    * Our first flow was run several times so there are more blocks shown
+        * additional runs created _new_ IDs, since we didn't specify a :flow-id for the _flow_ function 
 
-# Basic flow example
+
+    * There are more ways we can "talk data" to our running flows - open up one and right-click on any channel on the left hand side
+
+        ![1rabbit web ui](https://app.rabbitremix.com/send-channel.png)
+
+        * You'll see an options panel with 4 things in it
+            - a copy/paste command for using you REPL/app to send a value to that particular channel w async/put!
+            - a CURL command for sending a new value to that channel via the built-in REST endpoints(!)
+            - boxes containing the last 4 values this channel has seen, click to re-send them
+            - a text box to send an arbitrary value to that channel now (similar to earlier when we changed 10, but can be done on any channel)
+
+        * Notice how I selected the ```[:add-one :add-ten]``` channel - If I send a value here, it bypasses the upstream blocks, so you could essentially only use _part_ of a flow
+
+
+
+
+## From the UI
+TODO
+
+
+## Flow examples
+
+# Basic flow
 
 ![rabbit web ui](https://app.rabbitremix.com/gh-sample1.png)
 
@@ -107,7 +236,7 @@ Simple sample usage:
 
 TODO Explain what this does exactly.
 
-# Medium complexity example
+# Medium complexity
 
 ![rabbit web ui](https://app.rabbitremix.com/gh-sample4.png)
 
