@@ -72,7 +72,9 @@
                  :components {:comp1 10
                               :comp2 20
                               :comp3 [133 45]
-                              :simple-plus-10 #(+ 10 %)
+                              :simple-plus-10 {:fn #(+ 10 %)
+                                               :speak (fn [x]
+                                                        (str "Hey genius! I figured out your brain-buster of a math problem... It's " x))}
                               :add-one #(+ 1 %)
                               :adder-one {:fn #(apply + %)
                                           :inputs [:in]}

@@ -295,6 +295,8 @@
                                                 :style {:color "orange"}
                                                 :child (str (get x :error))]]])
                            (get block-function :view))
+                    speak-fn (get block-function :speak) ;; or [:speak :fn] later
+                    speak (when (fn? speak-fn) (try (speak-fn result) (catch Exception _ nil)))
                     view-out (when (fn? view) (try (let [vv (view result)] ;; if view isn't hiccup and just a string, let's make it pretty?
                                                      (if (string? vv)
                                                        [:re-com/box
@@ -327,7 +329,8 @@
                                               :input (ut/limited data-val)})
                                  (if #_{:clj-kondo/ignore [:not-empty?]}
                                   (not (empty? condis)) {:cond condis} {})
-                                 (if view {:view view-out} {}))
+                                 (if view {:view view-out} {})
+                                 (if speak {:speak speak} {}))
                     value-only (fn [x] (if (and (map? x) (get x :port-in?))
                                          (first (vals (dissoc x :port-in?))) x))]
 
