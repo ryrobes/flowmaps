@@ -23,16 +23,19 @@
 * [What is Flow Based Programming?](#flow-based-programming)
 
 * [Getting started (Start Here!)](#how-to-get-started)
-   * [from the REPL (w lein)](#from-the-repl-w-lein)
-   * [From the UI](#from-the-ui)
+   * [Basics](#basics---from-the-repl-w-lein)
+   * ["Curiouser and curiouser!" cried Alice](#curiouser-and-curiouser-cried-alice)
+        * [Conditional Paths](#conditional-paths)
+        * [Optional block "views"](#optional-block-views)
+        * [Static value inputs](#static-value-inputs)
+        * [Optional block "speak" / text-to-speech](#optional-block-speak--text-to-speech)
+        * [Grid data / "rowsets"](#grid-data--rowsets)
+        * [More on multi-input Blocks (input "ports")](#more-on-multi-input-blocks-input-ports)
+        * [Optional block "canvas" metadata](#optional-block-canvas-metadata)   
 
 * [Features](#core-flow-runner-features)
     * [The Core "flow runner"](#core-flow-runner-features)
     * ["Rabbit" Debugger / Visualizer Canvas (optional)](#rabbit-front-end-debugger-features-optional)
-
-* [Flow examples](#flow-examples)
-    * [Basic flow](#basic-flow)
-    * [Medium complexity](#medium-complexity)
 
 * Function documentation
     * [_"flow"_ function options](#flow-function-options)
@@ -63,7 +66,7 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 
 # How to get started
 
-## from the REPL (w lein)
+## Basics - from the REPL (w lein)
 * Add flowmaps to your deps
     * ``` [com.ryrobes/flowmaps "0.31-SNAPSHOT"] ```
 * Boot up your REPL
@@ -186,10 +189,280 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 
         * Notice how I selected the ```[:add-one :add-ten]``` channel - If I send a value here, it bypasses the upstream blocks, so you could essentially only use _part_ of a flow
 
+## "Curiouser and curiouser!" cried Alice
+
+Great! 🐇 Now that we've gone end-to-end on a simple example, we can start mixing in some more interesting options. Feel free to take a break here if you're a bit overwhelmed, I know how having tons of crap thrown at you at one time can be a negative experience. Maybe take some [hammock time](https://www.youtube.com/watch?v=f84n5oFoZBc) and consider what you're trying to accomplish and come back fresh! 
+
+That being said, let's mix in some more!
+
+## Conditional Paths
+By default when you link a block to another - when the function successfully runs, whatever the resulting value was gets shipped to the next block via the channel that they share. They don't care, all the care about is getting new data and producing new values. If they have 10 output channels, they'll ship to 10 channels.
+
+Think of it as a conveyor belt - each worker at each station isn't concerned with any other worker - only what is in front of them.
+
+But sometimes you want to have a "special case" channel flow to occur. In flowmaps we use the :cond key for these conditional pathways.
+
+![1rabbit web ui](https://app.rabbitremix.com/oddeven.png)
+
+```clojure
+{:description "simple example of conditional pathways"
+               :components {:int1 10
+                            :int2 21
+                            :adder {:fn + ;; notice that adder has no "traditional" connections, just a bool set of condis
+                                    :inputs [:in1 :in2]
+                                    :cond {:odd? #(odd? %) ;; 2 bool conditional dyn outs with no "real" output flow below
+                                           :even? #(even? %)}}
+                            :odd? (fn [x] (when (odd? x) "odd!"))
+                            :even? (fn [x] (when (even? x) "even!"))
+                            :display-val {:fn (fn [x] x)
+                                          :view (fn [x] [:re-com/box
+                                                         :align :center :justify :center
+                                                         :style {:font-size "105px"
+                                                                 :color "orange"
+                                                                 :font-family "Sansita Swashed"}
+                                                         :child (str x)])}}
+               :connections [[:int1 :adder/in1]
+                             [:int2 :adder/in2] ;; notice that nothing connects TO :odd?, :even? here since it's logic is handled above
+                             [:odd? :display-val] ;; but we DO need to handle FROM both possibilities
+                             [:even? :display-val]
+                             [:display-val :done]]}
+```
+
+Note: they can be used in conjunction with "regular pathways" (that always ship) or you can have a block with _only_ conditional pathways. A simple example would be odd or even. They both cannot be true at the same time, but one HAS to be true if we're receiving numbers, so the flow continues. However, what if we had 3 conditional pathways... odd? even? divisible-by-6? In this case sometimes we'd have 2 conditional channels shipping at times.
+
+This can also be used for loops - taking a self-referential / recursive path until some condition is met and then breaking out of it.
+
+![1rabbit web ui](https://app.rabbitremix.com/loop-note.png)
+
+Slightly harder to explain, but the cond in this example essentially breaks the recursion. Also notice that for each loop the data continues right-ward for side-effects to other blocks also.
+
+```clojure
+{:components {:comp1 10
+              :comp2 20.1
+              :comp3 [133 45]
+              :simple-plus-10 {:fn #(+ 10 %)}
+              :add-one {:fn #(+ % 1)}
+              :add-one2 {:fn #(+ 1 %)}
+              :add-one3 {:fn #(+ 1 %)}
+              :counter {:fn #(count %)
+                         :view (fn [x] (str x " loops"))}
+               :conjer {:fn (fn [x] (defonce vv (atom []))
+                                    (do (swap! vv conj x) @vv))}
+               :add-one4 {:fn #(+ 45 %)
+                          :cond {:condicane2 #(> % 800)}} ;; here is the loop breaker
+               :display-val {:fn (fn [x] x)}
+               :whoops {:fn #(str % ". YES.")}
+               :condicane2 {:fn #(str "FINAL VAL: " % " DONE")}
+               :adder {:fn +
+                       :inputs [:in1 :in2]}}
+ :connections [[:comp1 :adder/in1]
+               [:comp2 :adder/in2]
+               [:adder :simple-plus-10]
+               [:condicane2 :whoops]
+               [:add-one4 :add-one2] ;; recur
+               [:add-one4 :display-val]
+               [:add-one4 :conjer]
+               [:conjer :counter]
+               [:whoops :done]
+               [:simple-plus-10 :add-one]
+               [:add-one :add-one2]
+               [:add-one2 :add-one3]
+               [:add-one3 :add-one4]]}
+```
+
+## Optional block "views"
+
+A great thing about having an awesome viewer for our flows with Rabbit, is that we can add some spice to pipelines that otherwise would be very plain. Now, granted, in full-on headless production mode we wouldn't be using Rabbit - but in many cases (like ETL pipelines, manually run processes, etc) we have no problem using Rabbit to run things - so why not add some *extra* bit of custom observability to our flow?
+
+Each block can have a :view function defined which is run _after_ the main function, and passes the return output to the :view function. This is run server-side and can return a custom string (gotta love the classics) that will be rendered nicely in the center of the block - or you can return Clojure Hiccup HTML structures, keywordized re-com components, or a vega-lite spec for visualization.
+
+You can use a simple string and it'll be rendered "pretty".
+```clojure
+                :extract {:fn (fn [_] ;; ignoring actual sent value here - it's a trigger / signal
+                                (let [db {:subprotocol "sqlite"
+                                          :subname "/home/ryanr/boston-crime-data.db"}]
+                                  (jdbc/query db ["SELECT o.*, substring(occurred_on_date, 0, 11) as ON_DATE FROM offenses o"])))
+                          :view (fn [x] (str "Extracted " (ut/nf (count x)) " rows"))}
+```
+
+![1rabbit web ui](https://app.rabbitremix.com/simple-view.png)
+
+Or you can use hiccup and keywordized re-com components! Go nuts.
+
+```clojure
+                :extract {:fn (fn [_] ;; ignoring actual sent value here for demo purposes (it's a trigger / signal)
+                                (let [db {:subprotocol "sqlite"
+                                          :subname "/home/ryanr/boston-crime-data.db"}]
+                                  (jdbc/query db ["SELECT o.*, substring(occurred_on_date, 0, 11) as ON_DATE FROM offenses o"])))
+                          ;:view (fn [x] (str "Extracted " (ut/nf (count x)) " rows"))
+                          :view (fn [x] [:re-com/v-box
+                                         :size "auto"
+                                         :align :center :justify :center
+                                         :style {:border "3px dotted yellow"
+                                                 :font-size "33px"
+                                                 :color "yellow"
+                                                 :font-family "Merriweather"
+                                                 :background-color "maroon"}
+                                         :children [[:re-com/box :size "auto"
+                                                     :child "Extracted:"]
+                                                    [:re-com/box :size "auto"
+                                                     :child (str (ut/nf (count x)) " rows")]]])}
+```
+
+![1rabbit web ui](https://app.rabbitremix.com/simple-view2.png)
+
+...or... 👀
+
+```clojure
+                               :conjer {:fn (fn [x]
+                                              (defonce vv (atom [])) ;; block has "local state" for each value it sees
+                                              (do (swap! vv conj x) @vv))
+                                        :view (fn [x]                ;; lets draw a bar as the data comes in row by row
+                                                [:vega-lite {:data {:values (map-indexed (fn [index value]
+                                                                                           {:index index
+                                                                                            :value value}) x)}
+                                                             :mark {:type "bar"
+                                                                    :color "#60a9eb66"}
+                                                             :encoding {:x {:field "index" :type "ordinal"
+                                                                            :title "index of conj pass"
+                                                                            :axis {:labelColor "#ffffff77"
+                                                                                   :ticks false
+                                                                                   :titleColor "#ffffff"
+                                                                                   :gridColor "#ffffff11"
+                                                                                   :labelFont "Poppins" 
+                                                                                   :titleFont "Poppins"
+                                                                                   :domainColor "#ffffff11"}}
+                                                                        :y {:field "value" :type "quantitative"
+                                                                            :title "random additive values"
+                                                                            :axis {:labelColor "#ffffff77"
+                                                                                   :titleColor "#ffffff"
+                                                                                   :ticks false
+                                                                                    ;:gridColor "#00000000"
+                                                                                   :gridColor "#ffffff11"
+                                                                                   :labelFont "Poppins" 
+                                                                                   :titleFont "Poppins" 
+                                                                                   :labelFontSize 9 
+                                                                                   :labelLimit 180
+                                                                                   ;;:labelFontStyle {:color "blue"}
+                                                                                   :domainColor "#ffffff11"}}}
+                                                             :padding {:top 15 :left 15}
+                                                             :width "container"
+                                                             :height :height-int
+                                                             :background "transparent"
+                                                             :config {:style {"guide-label" {:fill "#ffffff77"}
+                                                                              "guide-title" {:fill "#ffffff77"}}
+                                                                      :view {:stroke "#00000000"}}} {:actions false}])}
+```
+
+![1rabbit web ui](https://app.rabbitremix.com/bars.png)
+
+
+As a funny aside, I was using chatGPT to create sample flows to test out some edge cases, and it usually interprets the :view key as a first class feature, it created a color scale block when I asked for a flow that is "interesting".
 
 
 
-## From the UI
+```clojure
+{:description "sample flow created by GPT4 for testing purposes (color art hiccup)"
+ :components {:seed 45
+              :generate-sequence
+                {:fn (fn [n]
+                       (map #(/ % n) (range n)))
+                 :view (fn [x]
+                         [:re-com/box :size "auto" :padding "6px"
+                          :child (str "Generated sequence: " (pr-str x))])}
+              :generate-colors
+                {:fn (fn [sequence]
+                       (map #(str "hsl(" (* % 360) ",100%,50%)") sequence))
+                 :inputs [:sequence]
+                 :view (fn [x]
+                         [:re-com/box :size "auto" :padding "6px"
+                          :child (str "Generated colors: " (pr-str x))])}
+              :render-art
+                {:fn (fn [colors]
+                       [:re-com/h-box
+                        :children (map (fn [color]
+                                         [:div
+                                          {:style
+                                           {:background-color color
+                                            :width "20px"
+                                            :height :height-int}}]) colors)])
+                 :inputs [:colors]
+                 :view (fn [x]
+                         [:re-com/box
+                          :child x])}}
+ :connections
+   [[:seed :generate-sequence]
+    [:generate-sequence :generate-colors/sequence]
+    [:generate-colors :render-art/colors]]}
+
+```
+
+![1rabbit web ui](https://app.rabbitremix.com/color-flow.png)
+
+## Static value inputs
+
+![1rabbit web ui](https://app.rabbitremix.com/inputs.png)
+
+We briefly passed over this in the "mutate" values part of the intro above - any static value block will editable as a code window on the Rabbit canvas. Integer, string, float, map, etc - it's an easy way to test things out / experiment.
+
+## Optional block "speak" / text-to-speech
+
+![1rabbit web ui](https://app.rabbitremix.com/talking-block.gif)
+
+Much like optional block "views" above - :speak can hold an function that takes in the return value of the main block function and produces a value that will be spoken in the Rabbit UI. However, this requires that add an ElevenLabs API key via the Rabbit settings panel (hit the gears icon in the upper right of the canvas), where you can also choose what voice to use via a dropdown. This can be done for fun, or for audio "notifications" depending on your flow use cases. Again, if you are running headlessly, this is ignored and will have no impact on anything.
+
+```clojure
+{:components ;; example of "speaking block"
+  {:comp1 12
+   :comp2 20
+   :simple-plus-10 
+    {:fn #(+ 10 %)
+     :speak (fn [x] ;; gets the return / output of the fn above ^
+          (str "Hey genius! I figured out your brain-buster 
+           of a math problem... It's " x ".  Wow. Ground-breaking."))}
+   :adder {:fn + :inputs [:in1 :in2]}}
+   :connections [[:comp1 :adder/in1]
+                 [:comp2 :adder/in2]
+                 [:adder :simple-plus-10]]}
+```
+
+![1rabbit web ui](https://app.rabbitremix.com/11labs.png)
+
+## Grid data / "rowsets"
+
+![1rabbit web ui](https://app.rabbitremix.com/grid.png)
+
+Just a helper in the Rabbit UI, if something is detected as a "rowset" (a 'pseudo data-type' = a vector of uniform maps), often used in REST APIs and database resultsets - there will be a "grid" option for the block (which is virtualized and much less expensive to render than the general Clojure data nested box renderer that Rabbit uses).
+
+_Note:_ by default we will only send a limited number of rows to the UI, it's just a sample as to not overwhelm the browser. 
+
+## More on multi-input Blocks (input "ports")
+
+As we can see with block functions with multi-input "port" blocks - a block with multiple inputs will automatically WAIT for all blocks to respond before it executes, however - on subsequent runs if it receives a partial result it will use the old value from the secondary source. I'm looking to add some more options to control this flow in the future FYI.
+
+## Optional block "canvas" metadata
+
+By default the flow blocks will be arranged with a very basic algo, which is most likely not what you will want. Feel free to drag around and resize the blocks as you see fit. However, these positions will be lost next time the flow is run unless we persist these values.
+
+Open up the flow-map-edn panel from the top right panel button. You'll see a new panel with all the current canvas metadata, feels free to copy-paste this into your flowmap under a :canvas key. You'll see several sample flows that use this by default. Again, totally optional, but if you and your team use Rabbit to inspect flows frequently having a nice layout can be very helpful.
+
+![1rabbit web ui](https://app.rabbitremix.com/canvas-key.png)
+
+You'll also notice that we save the "view mode" for each block, which can be helpful if you want to default a view/grid/input mode upon next loading.
+
+```clojure
+{:components {...}
+ :connections [...] ;; just drag things around ^^ and paste it in to your flow map!
+ :canvas  {:comp1 {:x 100 :y 100 :h 255 :w 240 :view-mode "data"}
+           :adder/in1 {:x 430 :y 100 :h 255 :w 240 :view-mode "data"}
+           :comp2 {:x 100 :y 430 :h 255 :w 240 :view-mode "data"}
+           :adder/in2 {:x 430 :y 430 :h 255 :w 240 :view-mode "data"}
+           :adder {:x 768 :y 413 :h 255 :w 240 :view-mode "data"}
+           :simple-plus-10 {:x 1111 :y 419 :h 255 :w 240 :view-mode "data"}}}
+```
+
+## Writing a flow from the Rabbit canvas
+
 TODO
 
 ---

@@ -199,7 +199,10 @@
                                                                                    :ticks false
                                                                                     ;:gridColor "#00000000"
                                                                                    :gridColor "#ffffff11"
-                                                                                   :labelFont "Poppins" :titleFont "Poppins" :labelFontSize 9 :labelLimit 180
+                                                                                   :labelFont "Poppins"
+                                                                                   :titleFont "Poppins"
+                                                                                   :labelFontSize 9
+                                                                                   :labelLimit 180
                                                                                    ;;:labelFontStyle {:color "blue"}
                                                                                    :domainColor "#ffffff11"}}}
                                                              :padding {:top 15 :left 15}
@@ -310,34 +313,33 @@
 ;; chatGPT4 created flow
 (def color-art-flow
   {:description "sample flow created by GPT4 for testing purposes (color art hiccup)"
-   :components
-   {:seed 45
-    :generate-sequence
-    {:fn (fn [n]
-           (map #(/ % n) (range n)))
-     :view (fn [x]
-             [:re-com/box :size "auto" :padding "6px"
-              :child (str "Generated sequence: " (pr-str x))])}
-    :generate-colors
-    {:fn (fn [sequence]
-           (map #(str "hsl(" (* % 360) ",100%,50%)") sequence))
-     :inputs [:sequence]
-     :view (fn [x]
-             [:re-com/box :size "auto" :padding "6px"
-              :child (str "Generated colors: " (pr-str x))])}
-    :render-art
-    {:fn (fn [colors]
-           [:re-com/h-box
-            :children (map (fn [color]
-                             [:div
-                              {:style
-                               {:background-color color
-                                :width "20px"
-                                :height :height-int}}]) colors)])
-     :inputs [:colors]
-     :view (fn [x]
-             [:re-com/box
-              :child x])}}
+   :components {:seed 45
+                :generate-sequence
+                {:fn (fn [n]
+                       (map #(/ % n) (range n)))
+                 :view (fn [x]
+                         [:re-com/box :size "auto" :padding "6px"
+                          :child (str "Generated sequence: " (pr-str x))])}
+                :generate-colors
+                {:fn (fn [sequence]
+                       (map #(str "hsl(" (* % 360) ",100%,50%)") sequence))
+                 :inputs [:sequence]
+                 :view (fn [x]
+                         [:re-com/box :size "auto" :padding "6px"
+                          :child (str "Generated colors: " (pr-str x))])}
+                :render-art
+                {:fn (fn [colors]
+                       [:re-com/h-box
+                        :children (map (fn [color]
+                                         [:div
+                                          {:style
+                                           {:background-color color
+                                            :width "20px"
+                                            :height :height-int}}]) colors)])
+                 :inputs [:colors]
+                 :view (fn [x]
+                         [:re-com/box
+                          :child x])}}
    :connections
    [[:seed :generate-sequence]
     [:generate-sequence :generate-colors/sequence]
