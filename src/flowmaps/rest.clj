@@ -47,15 +47,14 @@
            v value]
        (ut/ppln [:incoming-channel-push channel-name value])
        (push! flow-id from [flow-id :blocks from :body] {:v value} start (System/currentTimeMillis))
-       (swap! db/channel-history assoc flow-id (conj (get @db/channel-history flow-id [])
-                                                     {:path [:pushed :from :web]
+       (swap! db/channel-history update flow-id conj {:path [:pushed :from :web]
                                                       :type :channel
                                                       :channel channel-name
                                                       :dest (last channel-name)
                                                       :start start
                                                       :end (System/currentTimeMillis)
                                                       :value (ut/limited v flow-id)
-                                                      :data-type (ut/data-typer v)}))
+                                                      :data-type (ut/data-typer v)})
        (swap! db/fn-history assoc flow-id (conj (get @db/fn-history flow-id []) {:block from :from :static
                                                                                  :path [:from :static from]
                                                                                  :value (ut/limited value flow-id)
