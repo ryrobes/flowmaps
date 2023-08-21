@@ -523,6 +523,8 @@
                               static-input? (and (not (fn? from-val)) ;; not a raw fn block
                                                  (nil? (get from-val :fn)))
                               view-mode (get-in network-map [:canvas bid :view-mode])
+                              hidden1? (get-in network-map [:canvas bid :hidden?])
+                              hidden? (if (and (nil? hidden1?) (ut/namespaced? bid)) true hidden1?)
                           ;text-input? (true? (some #(= :text-input %) (flatten [from-val])))
                               block-def (merge {:y (or (get-in network-map [:canvas bid :y]) (get v :y (get-in coords-map [bid :y]))) ;; deprecated locations TODO
                                                 :x (or (get-in network-map [:canvas bid :x]) (get v :x (get-in coords-map [bid :x]))) ;; deprecated locations
@@ -532,7 +534,7 @@
                                                 :type :text
                                                 :flowmaps-created? true
                                                 :block-type "map2"
-                                                :hidden? (get-in network-map [:canvas bid :hidden?] (ut/namespaced? bid))
+                                                :hidden? hidden?
                                                 :hidden-by (when (ut/namespaced? bid)
                                                              (try (edn/read-string (first (cstr/split (str bid) #"/"))) (catch Exception _ nil)))
                                                 :view-mode (if (get v :view) "view" "data")
@@ -548,7 +550,7 @@
                   (do (swap! db/block-defs assoc-in [flow-id bid] block-def)
                       (rest/push! flow-id bid [flow-id :blocks bid] block-def)))
 
-                (doseq [[bid v] (get network-map :canvas) ;; decorative front-end-only blocks ("map pulls")
+                (doseq [[bid v] (get network-map :canvas) ;; decorative front-end-only blocks ("map pulls" / visual get-in)
                         :when (string? bid)
                         :let [block-def {:y (or (get-in network-map [:canvas bid :y]) (get v :y (get-in coords-map [bid :y]))) ;; deprecated locations TODO
                                          :x (or (get-in network-map [:canvas bid :x]) (get v :x (get-in coords-map [bid :x]))) ;; deprecated locations

@@ -8,62 +8,62 @@
             [flowmaps.utility :as ut]))
 
 ;; flow defs for examples. work in progress.
-(def openai-calls {:description "a simple HTTP loop using OpenAI API endpoint that keeps adding to chat history"
-                   :components {:prompt "Top O' the morning!"
-                                :openai-api-key (System/getenv "OAI_KEY")
-                                :ai-ask {:fn (fn [prompt openai-api-key history]
-                                               (let [question {:role "user"
-                                                               :content (str prompt)}]
-                                                 (defonce last-prompt (atom nil))
-                                                 (reset! last-prompt prompt) ;; to keep the loop from running amok (see :pre-when? below)
-                                                 {:question question
-                                                  :history (vec (conj history question))
-                                                  :answer (clojure.walk/keywordize-keys
-                                                           (clojure.data.json/read-str
-                                                            (get (clj-http.client/post
-                                                                  "https://api.openai.com/v1/chat/completions"
-                                                                  {:body (clojure.data.json/write-str
-                                                                          {:model "gpt-4" ; "gpt-3.5-turbo"
-                                                                           :messages (vec (conj history question))})
-                                                                   :headers {"Content-Type" "application/json"
-                                                                             "Authorization" (str "Bearer " openai-api-key)}
-                                                                   :socket-timeout 300000
-                                                                   :connection-timeout 300000
-                                                                   :content-type :json
-                                                                   :accept :json}) :body)))}))
-                                         :pre-when? (fn [prompt _ _] ;; pre-when gets the same payload as the main fn
-                                                      (let [same? (= prompt @last-prompt)]
-                                                        (not same?)))
-                                         :inputs [:prompt :openai-api-key :history]}
-                                :last-response (fn [x] x) ;; just to have a data block for the UI
-                                :memory {:fn (fn [{:keys [question history answer]}]
-                                               (let [aa (get-in answer [:choices 0 :message])]
-                                                 (conj history aa)))
-                                         :speak (fn [x] (str (get (last x) :content))) ;; if in Rabbit, and ElevenLabs KEY, read the answer
-                                         :starter [{:role "system" ;; ""bootstrap"" history with sys prompt
-                                                    :content "You are a helpful assistant, you responses will be framed as if you are Buffy from the 1992 film."}]}}
+(def openai-calls
+  {:description "a simple HTTP loop using OpenAI API endpoint that keeps adding to chat history"
+   :components {:prompt "Top O' the morning!"
+                :openai-api-key (System/getenv "OAI_KEY")
+                :ai-ask {:fn (fn [prompt openai-api-key history]
+                               (let [question {:role "user"
+                                               :content (str prompt)}]
+                                 (defonce last-prompt (atom nil))
+                                 (reset! last-prompt prompt) ;; to keep the loop from running amok (see :pre-when? below)
+                                 {:question question
+                                  :history (vec (conj history question))
+                                  :answer (clojure.walk/keywordize-keys
+                                           (clojure.data.json/read-str
+                                            (get (clj-http.client/post
+                                                  "https://api.openai.com/v1/chat/completions"
+                                                  {:body (clojure.data.json/write-str
+                                                          {:model "gpt-4" ; "gpt-3.5-turbo"
+                                                           :messages (vec (conj history question))})
+                                                   :headers {"Content-Type" "application/json"
+                                                             "Authorization" (str "Bearer " openai-api-key)}
+                                                   :socket-timeout 300000
+                                                   :connection-timeout 300000
+                                                   :content-type :json
+                                                   :accept :json}) :body)))}))
+                         :pre-when? (fn [prompt _ _] ;; pre-when gets the same payload as the main fn
+                                      (not (= prompt @last-prompt)))
+                         :inputs [:prompt :openai-api-key :history]}
+                :last-response (fn [x] x) ;; just to have a data block for the UI
+                :memory {:fn (fn [{:keys [question history answer]}]
+                               (let [aa (get-in answer [:choices 0 :message])]
+                                 (conj history aa)))
+                         :speak (fn [x] (str (get (last x) :content))) ;; if in Rabbit, and ElevenLabs KEY, read the answer
+                         :starter [{:role "system" ;; ""bootstrap"" history with sys prompt
+                                    :content "You are a helpful assistant, you responses will be framed as if you are Buffy from the 1992 film."}]}}
                    ;; canned REST / sub-flow endpoints 
-                   :points {"question" [[:prompt :ai-ask/prompt] ;; (channel to insert into)
-                                        [:ai-ask :memory]]} ;; (channel to snatch out of downstream)
+   :points {"question" [[:prompt :ai-ask/prompt] ;; (channel to insert into)
+                        [:ai-ask :memory]]} ;; (channel to snatch out of downstream)
                             ;; ^^ send question, get answer (keeps convo state)
-                   :hide [:openai-api-key]
-                   :connections [[:prompt :ai-ask/prompt]
-                                 [:openai-api-key :ai-ask/openai-api-key]
-                                 [:ai-ask :memory]
-                                 [:ai-ask :last-response]
-                                 [:memory :ai-ask/history]]
-                   :canvas {:ai-ask/openai-api-key {:x 430 :y 430 :h 255 :w 240 :view-mode "text" :hidden? true}
-                            :ai-ask/prompt {:x 430 :y 100 :h 255 :w 240 :view-mode "text" :hidden? true}
-                            :ai-ask/history {:x 466 :y 962 :h 350 :w 894 :view-mode "text" :hidden? true}
-                            :ai-ask {:x 815 :y 347 :h 522 :w 434 :view-mode "text"}
-                            :memory {:x -199 :y 750 :h 369 :w 538 :view-mode "data"}
-                            :openai-api-key {:x -243 :y 505 :h 141 :w 565 :view-mode "input"}
-                            :prompt {:x -136 :y 145 :h 212 :w 415 :view-mode "input"}
-                            :last-response {:x 1383 :y 380 :h 755 :w 818 :view-mode "data"}
-                            "just-the-answer" {:inputs [[:last-response [:text [:map [:v :answer :choices 0 :message :content]]]]]
-                                               :x 2585 :y 984 :h 215 :w 400}
-                            "just-the-question" {:inputs [[:last-response [:text [:map [:v :question :content]]]]]
-                                                 :x 2575 :y 577 :h 215 :w 400}}})
+   :hide [:openai-api-key]
+   :connections [[:prompt :ai-ask/prompt]
+                 [:openai-api-key :ai-ask/openai-api-key]
+                 [:ai-ask :memory]
+                 [:ai-ask :last-response]
+                 [:memory :ai-ask/history]]
+   :canvas {:ai-ask/openai-api-key {:x 430 :y 430 :h 255 :w 240 :view-mode "text" :hidden? true}
+            :ai-ask/prompt {:x 430 :y 100 :h 255 :w 240 :view-mode "text" :hidden? true}
+            :ai-ask/history {:x 466 :y 962 :h 350 :w 894 :view-mode "text" :hidden? true}
+            :ai-ask {:x 815 :y 347 :h 522 :w 434 :view-mode "text"}
+            :memory {:x -199 :y 750 :h 369 :w 538 :view-mode "data"}
+            :openai-api-key {:x -243 :y 505 :h 141 :w 565 :view-mode "input"}
+            :prompt {:x -136 :y 145 :h 212 :w 415 :view-mode "input"}
+            :last-response {:x 1383 :y 380 :h 755 :w 818 :view-mode "data"}
+            "just-the-answer" {:inputs [[:last-response [:text [:map [:v :answer :choices 0 :message :content]]]]]
+                               :x 2585 :y 984 :h 215 :w 400}
+            "just-the-question" {:inputs [[:last-response [:text [:map [:v :question :content]]]]]
+                                 :x 2575 :y 577 :h 215 :w 400}}})
 
 (def my-network {:description "a simple example flow: addition and integers"
                  :components {:comp1 10
