@@ -7,10 +7,10 @@
                  [io.pedestal/pedestal.service "0.5.10"]
                  [io.pedestal/pedestal.jetty "0.5.10"]
                  [org.slf4j/slf4j-nop "1.7.32"]
-                 [org.clojure/java.jdbc "0.7.12"]    ;; example flow testing purposes only, will be removed next release
-                 [org.xerial/sqlite-jdbc "3.36.0.3"] ;; example flow testing purposes only, will be removed next release
-                 [clj-http "3.12.3"]                 ;; example flow testing purposes only, will be removed next release
-                 [org.clojure/data.json "2.4.0"]     ;; example flow testing purposes only, will be removed next release
+                 [org.clojure/java.jdbc "0.7.12"]          ;; ex flow testing purposes only, will be removed next release
+                 [org.xerial/sqlite-jdbc "3.36.0.3"]       ;; ex flow testing purposes only, will be removed next release
+                 [clj-http "3.12.3"]                       ;; ex flow testing purposes only, will be removed next release
+                 [org.clojure/data.json "2.4.0"]           ;; ex flow testing purposes only, will be removed next release
                  [talltale "0.5.8"  ;; exclusions recommended by `lein deps :tree`
                   :exclusions [org.clojure/spec.alpha org.clojure/core.specs.alpha]]
                  [mvxcvi/puget "1.3.2"]

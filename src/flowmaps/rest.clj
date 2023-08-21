@@ -54,15 +54,15 @@
                                                       :dest (last channel-name)
                                                       :start start
                                                       :end (System/currentTimeMillis)
-                                                      :value (ut/limited v)
+                                                      :value (ut/limited v flow-id)
                                                       :data-type (ut/data-typer v)}))
        (swap! db/fn-history assoc flow-id (conj (get @db/fn-history flow-id []) {:block from :from :static
                                                                                  :path [:from :static from]
-                                                                                 :value (ut/limited value) ;(ut/limited (get web-val-map :v)) ;; since it's going to the front-end ultimately
+                                                                                 :value (ut/limited value flow-id)
                                                                                  :type :function
                                                                                  :dest from
                                                                                  :channel [from]
-                                                                                 :data-type (ut/data-typer (ut/limited value))
+                                                                                 :data-type (ut/data-typer (ut/limited value flow-id))
                                                                                  :start start
                                                                                  :end (System/currentTimeMillis)
                                                                                  :elapsed-ms (- (System/currentTimeMillis) start)}))
@@ -85,9 +85,34 @@
             event event ;(get event :value) ; Found the desired event, return it
             (> (System/currentTimeMillis) deadline)
             (throw (Exception. (str "Timeout waiting for event to hit channel " channel " in flow " flow-id)))
-            :else (do (Thread/sleep 50) ; Wait for a short duration before polling again
+            :else (do (Thread/sleep 300) ; Wait for a short duration before polling again
                       (recur))))))
     (catch Exception e {:error (str e)})))
+
+(defn flow-point-push [request]
+  (let [point-id (get-in request [:path-params :point-id])
+        flow-id (get-in request [:path-params :flow-id])
+        point-data (get-in @db/working-data [flow-id :points point-id])
+        time-key (System/currentTimeMillis)
+        value (get request :edn-params) ;(get-in request [:edn-params :value])
+        channel (first point-data) ;(get-in request [:edn-params :channel])
+        return-channel (last point-data) ;(get-in request [:edn-params :return])
+        _ (push-channel-value [channel] flow-id value)
+        return (wait-for-event return-channel flow-id time-key 30000)]
+    (let [base {:flow-id flow-id ;; extra let to wait until return?
+                :return-value (get return :value)
+                :channel-sent-to channel
+                :value-sent value
+                :value value
+                :return-channel return-channel}
+          err-base {:flow-id flow-id
+                    :return-value return
+                    :channel-sent-to channel
+                    :value-sent value
+                    :error (get return :error)
+                    :return-channel return-channel}
+          error? (get return :error)]
+      (send-edn (if error? err-base base)))))
 
 (defn flow-value-push [request]
   (if (get-in request [:edn-params :return]) ;; are we picking up a channel val to return?

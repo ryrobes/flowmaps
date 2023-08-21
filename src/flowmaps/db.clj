@@ -13,6 +13,7 @@
 (defonce chains-completed (atom []))
 (defonce port-accumulator (atom {}))
 (defonce block-defs (atom {}))
+(defonce hidden-values (atom {}))
 (defonce waffle-data (atom {}))
 (defonce channels-atom (atom {})) ;; ref for putting things on later via REPL or whatever.
 (defonce condi-channels-atom (atom {})) ;; ref for putting things on later via REPL or whatever.

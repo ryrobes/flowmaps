@@ -38,6 +38,7 @@
 (def common-interceptors [(body-params/body-params) http/html-body])
 
 (def routes #{["/" :get (conj common-interceptors `static-root)]
+              ["/flowpoint/:flow-id/:point-id" :post (conj common-interceptors `rest/flow-point-push)]
               ["/flow-value-push/:flow-id" :post (conj common-interceptors `rest/flow-value-push)]})
 
 (def service {:env :prod
@@ -110,7 +111,7 @@
                  :path (str path)
                  :ms (- end start)
                  :data-type data-type
-                 :value (ut/limited value)
+                 :value (ut/limited value flow-id)
                  :type type
                  :dest (str dest)
                  :raw-end endv

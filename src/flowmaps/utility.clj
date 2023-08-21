@@ -31,75 +31,80 @@
          :else x)
        (catch Exception _ x)))
 
-(defn limited [x]
-  (letfn [(limited-helper [x]
-            (cond
-              (map? x) (into (empty x) (map (fn [[k v]] [k (limited-helper v)])) x)
-              (coll? x) (into (empty x) (take db/sample-limit (map limited-helper x)))
-              (and (not (string? x)) (not (keyword? x)) (not (number? x)))
-              (try (doall (take db/sample-limit x)) (catch Exception _ x))
-              :else x))]
-    (limited-helper x)))
+(defn hide-secret [flow-id x] ;; TODO, upcoming secrets, this just hides from the UI for now
+  (try
+      (walk/postwalk-replace (get @db/hidden-values flow-id) x) (catch Exception _ x)))
 
-(defn limited-t [x]
-  (walk/postwalk limited x))
+  (defn limited [x flow-id]
+    (hide-secret flow-id
+     (letfn [(limited-helper [x]
+               (cond
+                 (map? x) (into (empty x) (map (fn [[k v]] [k (limited-helper v)])) x)
+                 (coll? x) (into (empty x) (take db/sample-limit (map limited-helper x)))
+                 (and (not (string? x)) (not (keyword? x)) (not (number? x)))
+                 (try (doall (take db/sample-limit x)) (catch Exception _ x))
+                 :else x))]
+       (limited-helper x))))
 
-(defn nf [i]
-  (pprint/cl-format nil "~:d" i))
+  (defn limited-t [x]
+    (walk/postwalk limited x))
 
-(defmacro timed-exec [expr] ;; expression based, not fn based
-  `(let [start# (System/currentTimeMillis)
-         result# ~expr
-         end# (System/currentTimeMillis)]
-     {:result result#
-      :fn-start start#
-      :fn-end end#
-      :elapsed-ms (- end# start#)}))
+  (defn nf [i]
+    (pprint/cl-format nil "~:d" i))
+
+  (defmacro timed-exec [expr] ;; expression based, not fn based
+    `(let [start# (System/currentTimeMillis)
+           result# ~expr
+           end# (System/currentTimeMillis)]
+       {:result result#
+        :fn-start start#
+        :fn-end end#
+        :elapsed-ms (- end# start#)}))
 
 ;; (defmacro timed-exec-with-dbgn [expr]
 ;;   `(let [dbgn-output# (with-out-str (debux.core/dbgn ~expr))
 ;;          exec-result# (timed-exec ~expr)]
 ;;      (assoc exec-result# :dbgn-output dbgn-output#)))
 
-(defn ppln [x]
-  (puget/with-options {:width 330}
-    (puget/cprint x)))
+  (defn ppln [x]
+    (puget/with-options {:width 330}
+      (puget/cprint x)))
 
-(defn pplno [_] nil) ;; TODO, goofy
+  (defn pplno [_] nil) ;; TODO, goofy
 
-(defn chan? [x] 
-  (try (-> x class .getName (= "clojure.core.async.impl.channels.ManyToManyChannel")) (catch Exception _ false)))
+  (defn chan? [x]
+    (try (-> x class .getName (= "clojure.core.async.impl.channels.ManyToManyChannel")) (catch Exception _ false)))
 
-(defn unkeyword [k]
-  (cstr/replace (str k) #":" "")
+  (defn unkeyword [k]
+    (cstr/replace (str k) #":" "")
   ;(name k) ;; caused error? w namespaced keywords?
-  )
+    )
 
-(defn namespaced? [k]
-  (not (nil? (namespace k))))
+  (defn namespaced? [k]
+    (not (nil? (namespace k))))
 
-(defn ms-to-iso8601 [ms]
-  (let [instant (Instant/ofEpochMilli ms)
-        formatter (DateTimeFormatter/ISO_INSTANT)]
-    (.format formatter instant)))
+  (defn ms-to-iso8601 [ms]
+    (let [instant (Instant/ofEpochMilli ms)
+          formatter (DateTimeFormatter/ISO_INSTANT)]
+      (.format formatter instant)))
 
-(defn is-hiccup? [x] (cstr/includes? (str x) ":div")) ;; TODO, no need anymore?
+  (defn is-hiccup? [x] (cstr/includes? (str x) ":div")) ;; TODO, no need anymore?
 
-(defn coll-of-maps? [x]
-  (and (or (list? x)
-           (vector? x))
-       (not (empty? x)) (every? map? x)))
+  (defn coll-of-maps? [x]
+    (and (or (list? x)
+             (vector? x))
+         (not (empty? x)) (every? map? x)))
 
-(defn has-nested-map-values? [x]
-  (try (let [aa (some true?
-                      (vec (if (and (or (list? x) (vector? x)) (not (empty? x)) (coll-of-maps? x))
-                             (if (map? (first x))
-                               (for [k (keys (first x))]
-                                 (or (map?    (get (first x) k))
-                                     (vector? (get (first x) k)))) false) false)))]
-         (if aa true false)) (catch Exception _ true)))
+  (defn has-nested-map-values? [x]
+    (try (let [aa (some true?
+                        (vec (if (and (or (list? x) (vector? x)) (not (empty? x)) (coll-of-maps? x))
+                               (if (map? (first x))
+                                 (for [k (keys (first x))]
+                                   (or (map?    (get (first x) k))
+                                       (vector? (get (first x) k)))) false) false)))]
+           (if aa true false)) (catch Exception _ true)))
 
-(defn data-typer [x] ;; legacy data rabbit code. TODO revisit
+  (defn data-typer [x] ;; legacy data rabbit code. TODO revisit
   ;(let [x (if (instance? clojure.lang.IPending x) (doall (take 20 x)) x)] ;; if lazy, do a limited realize
     (cond   (or (and (vector? x) (clojure.string/includes? (str x) "#object"))
                 (and (vector? x) (fn? (first x))) ;; ?
@@ -133,65 +138,65 @@
             (ifn? x) "function"
             :else "unknown"));)
 
-(defn gen-coords [blocks] ;; awful attempt at auto coord / layout placing - revist later
-  (let [start-x 100
-        start-y 100
-        step-x 330  ; 250 + 80
-        step-y 330  ; 250 + 80
-        placed-blocks (atom {})
-        max-y (atom start-y)
-        queue (atom blocks)]
+  (defn gen-coords [blocks] ;; awful attempt at auto coord / layout placing - revist later
+    (let [start-x 100
+          start-y 100
+          step-x 330  ; 250 + 80
+          step-y 330  ; 250 + 80
+          placed-blocks (atom {})
+          max-y (atom start-y)
+          queue (atom blocks)]
 
-    (while (seq @queue)
-      (let [[from to] (first @queue)]
-        (swap! queue rest)
+      (while (seq @queue)
+        (let [[from to] (first @queue)]
+          (swap! queue rest)
 
-        (when (not (contains? @placed-blocks from))
-          (do
-            (swap! placed-blocks assoc from [start-x @max-y])
-            (swap! max-y #(+ % step-y))))
-
-        (when (not (contains? @placed-blocks to))
-          (let [[from-x from-y] (@placed-blocks from)
-                to-x (+ from-x step-x)
-                to-y (if (= from-x to-x) (+ from-y step-y) from-y)]
+          (when (not (contains? @placed-blocks from))
             (do
-              (swap! placed-blocks assoc to [to-x to-y])
-              (when (> to-y @max-y) (swap! max-y #(+ % step-y))))))))
+              (swap! placed-blocks assoc from [start-x @max-y])
+              (swap! max-y #(+ % step-y))))
 
-    (mapv (fn [[block [x y]]] [block x y]) @placed-blocks)))
+          (when (not (contains? @placed-blocks to))
+            (let [[from-x from-y] (@placed-blocks from)
+                  to-x (+ from-x step-x)
+                  to-y (if (= from-x to-x) (+ from-y step-y) from-y)]
+              (do
+                (swap! placed-blocks assoc to [to-x to-y])
+                (when (> to-y @max-y) (swap! max-y #(+ % step-y))))))))
 
-(defn coords-map [connections]
-  (into {}
-        (for [[bid x y] (gen-coords connections)]
-          {bid {:x x :y y}})))
+      (mapv (fn [[block [x y]]] [block x y]) @placed-blocks)))
+
+  (defn coords-map [connections]
+    (into {}
+          (for [[bid x y] (gen-coords connections)]
+            {bid {:x x :y y}})))
 
 ;; spec explorations TODO, revisit
 
-(def nspc ['flowmaps.core 'clojure.set])
+  (def nspc ['flowmaps.core 'clojure.set])
 
-(defn get-fn-specs [ns-sym]
-  (->> (s/registry)
-       (filter #(= (namespace (key %)) (name ns-sym)))
-       (into {})))
+  (defn get-fn-specs [ns-sym]
+    (->> (s/registry)
+         (filter #(= (namespace (key %)) (name ns-sym)))
+         (into {})))
 
-(defn instrument-ns [ns-syms & [un?]] ;; nice 
-  (doseq [ns-sym ns-syms]
-    (->> (ns-publics ns-sym)
-         keys
-         (filter #(s/get-spec `%))
-         (apply (if un?
-                  stest/unstrument
-                  stest/instrument)))))
+  (defn instrument-ns [ns-syms & [un?]] ;; nice 
+    (doseq [ns-sym ns-syms]
+      (->> (ns-publics ns-sym)
+           keys
+           (filter #(s/get-spec `%))
+           (apply (if un?
+                    stest/unstrument
+                    stest/instrument)))))
 
-(defn test-value [ns-syms args]
-  (if (vector? args)
-    (let [specs (mapcat get-fn-specs ns-syms)]
-      (->> specs
-           (map (fn [[k v]]
-                  (let [args-spec (:args (s/spec v))]
-                    [(str (namespace k) "/" (name k)) (not= (s/conform args-spec args) :clojure.spec.alpha/invalid)])))
-           (into (sorted-map))))
-    (println "The provided arguments should be a vector.")))
+  (defn test-value [ns-syms args]
+    (if (vector? args)
+      (let [specs (mapcat get-fn-specs ns-syms)]
+        (->> specs
+             (map (fn [[k v]]
+                    (let [args-spec (:args (s/spec v))]
+                      [(str (namespace k) "/" (name k)) (not= (s/conform args-spec args) :clojure.spec.alpha/invalid)])))
+             (into (sorted-map))))
+      (println "The provided arguments should be a vector.")))
 
 
