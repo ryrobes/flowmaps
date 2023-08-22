@@ -436,9 +436,70 @@ Just a helper in the Rabbit UI, if something is detected as a "rowset" (a 'pseud
 
 _Note:_ by default we will only send a limited number of rows to the UI, it's just a sample as to not overwhelm the browser. 
 
-## More on multi-input Blocks (input "ports")
+## More on multi-input blocks (input "ports")
 
 As we can see with block functions with multi-input "port" blocks - a block with multiple inputs will automatically WAIT for all blocks to respond before it executes, however - on subsequent runs if it receives a partial result it will use the old value from the secondary source. I'm looking to add some more options to control this flow in the future FYI.
+
+## :pre-when? and :post-when?
+
+An added helpers for (easier) control flow. Much like the conditionals, it's simply for a boolean function that gets passed the input (for pre-when) or the output (for post-when). If it is false it will stop the flow to/from that block. Nothing fancy, but can be super helpful at times.
+
+```clojure
+{:components {:comp1 2
+              :comp2 20
+              :simple-plus-10 
+                     {:fn (fn [x] (+ 10 x))
+                      :pre-when? (fn [x] (> x 40))} ;; won't run unless input is > 40
+              :adder {:fn + 
+                      :post-when? #(> % 1) ;; won't pass return unless > 1
+                      :inputs [:in1 :in2]}}
+ :connections [[:comp1 :adder/in1]
+               [:comp2 :adder/in2]
+               [:adder :simple-plus-10]
+               [:simple-plus-10 :done]]}
+```
+
+## Pre-run "starter" values for functions
+
+Sometimes in a looping situation, we want to "seed" a value from a function block without executing it (yet), since a function won't run unless it's been passed an incoming value - and depending on our flow, we might not have a value yet.
+
+Example, in the `openai-history-loopflowmaps.examples.simple-flows/` example we start our chat history with a vector that contains a "system" statement, but later when we get passed _fresh_ history from our ChatGTP endpoint, we want to use that incoming value to run our function instead.
+
+```clojure
+ :memory {:fn (fn [{:keys [question history answer]}]
+                   (let [aa (get-in answer [:choices 0 :message])]
+                        (conj history aa)))
+          :starter [{:role "system" ;; ""bootstrap"" history with sys prompt BEFORE we receive an answer
+                     :content "You are a helpful assistant, you responses will be framed as if you are Buffy from the 1992 film."}]}}
+```
+
+Here :memory is not a static value, but a function in between 2 other functions - yet, it needs to have a value to pass before it receives one - since it depends on a block that also depends on it...
+
+![1rabbit web ui](https://app.rabbitremix.com/starter.png)
+
+Since Rabbit allows me to scrub through the execution, this is easier to show.
+- Left - :memory has not received a value from :ai-ask, so the function doesn't run - yet it's starter function flows anyways
+- Middle - our :ai-ask function has received the value, so it is able to execute
+- Right - :ai-ask has executed and sent it's payload to :memory, which in-turn takes it and executes to send back instead of using the starter value.
+
+## Hiding sensitive values from the UI (API Keys, passwords, etc)
+
+One of the great things about using vanilla clojure functions for blocks, is that you can use whatever libraries you want and don't have to worry about flowmaps, it will focus on it's task and get out of your way. So, I have no intent to bundle a "secrets" type library to use in API calls and database logins, etc. You can use whatever you'd like (or don't, hey, yolo) - _however_, what I _can_ do is make a option to hide these secret words from showing up in the Rabbit UI. No one needs that.
+
+Simply use a base key called :hide with a vector of all the blocks that contain a lone secret. Easy way to look at it is the screenshot above. My OpenAI API Key is in one of those static value blocks so it can be passed around to the rest of the flow as needed, yet it will never show up in the UI data samples, even if it ends up being nested somewhere downstream. It will be postwalk-replaced whenever it is seen.
+
+```clojure
+{:components {:secret-key "suburban-sasquatch-dont-look!" ;; or (System/getenv "BABY_SASS"), (get-secret! 1234), whatever
+              :lets-use-it (fn [x] {:nice [3 4 5 x]})}
+ :hide [:secret-key] ;; based on the materialized value of block, hide it everywhere in UI when possible
+ :connections [[:secret-key :lets-use-it]]}
+```
+
+![1rabbit web ui](https://app.rabbitremix.com/secret.png)
+
+Note: this does not impact the actual flow of data, just the web UI representation of it.
+
+
 
 ## Optional block "canvas" metadata
 
