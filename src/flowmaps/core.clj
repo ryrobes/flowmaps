@@ -46,8 +46,8 @@
 (s/def ::fn? (s/and ifn? #(not (map? %))))
 
 (s/def ::components (s/or :function ::fn?
-                         :map-with-function (s/and map? (s/keys :req-un [::fn?]))
-                         :static-value #(and (not (fn? %)) (not (map? (:fn %))))))
+                          :map-with-function (s/and map? (s/keys :req-un [::fn?]))
+                          :static-value #(and (not (fn? %)) (not (map? (:fn %))))))
 
 (s/def ::connection-pair (s/and vector? (s/coll-of (s/or :keyword keyword? :any any?) :count 2)))
 
@@ -57,7 +57,7 @@
 
 (s/def ::opts-map (s/keys :opt-un [::debug? ::debux?]))
 
-(s/def ::done-ch #(or (ut/chan? %) (instance? clojure.lang.Atom %)))
+(s/def ::done-ch #(or (ut/chan? %) (and (seqable? %) (ut/chan? (first %))) (instance? clojure.lang.Atom %)))
 
 (s/def ::subflow-map map?)
 
@@ -148,6 +148,8 @@
                   ;:history (sort-by :ts @db/history-atom)
                   ff :fp fp :results-atom (get @db/results-atom flow-id)])))))
 
+(declare flow) ;; so we can call it in (process ..) even though it's still undefined at this point
+
 (defn- process [flow-id connections input-chs output-chs ff fp block-function opts-map done-ch]
   (let [web-push? (true? @web/websocket?)
         {:keys [debug? debux?]} opts-map
@@ -170,14 +172,21 @@
               the-path (try
                          (apply max-key count (apply concat (vals (select-keys fp poss-path-keys))))
                          (catch Exception _ [:error-path-issue!]))
-              done-channel-push? (and (= ff :done) (ut/chan? done-ch))]
+              valid-output-channels? (or (ut/chan? done-ch) ;; single output channel
+                                         (try               ;; or several
+                                           (ut/chan? (first done-ch))
+                                           (catch Exception _ false)))
+              done-channel-push? (and (= ff :done)
+                                      valid-output-channels?)]
 
           (when (= ff :done)  ;; process any :done stuff, debug or not. ends this flow-chain-path basically
-            (let [done-channel? (ut/chan? done-ch)
+            (let [done-channel? valid-output-channels? ;(ut/chan? done-ch)
+                  multi-ch? (seqable? done-ch)
                   done-atom? (instance? clojure.lang.Atom done-ch)
                   channels (+ (count (keys (get @db/channels-atom flow-id)))
                               (count (keys (get @db/condi-channels-atom flow-id))))]
               (cond done-atom? (reset! done-ch data-val)
+                    (and done-channel? multi-ch?) (doseq [d done-ch] (async/>! d data-val))
                     done-channel? (async/>! done-ch data-val)
                     :else nil)
               ;(println (str data-val))
@@ -213,23 +222,35 @@
                   (end-chain-msg flow-id fp ff nil the-path))
 
               (let [block-fn-raw? (fn? block-function)
+                    is-subflow? (s/valid? ::network-map block-function)
                     block-is-port? (and (not block-fn-raw?)
                                         (get block-function :fn)
                                         (ut/namespaced? ff))
                     inputs (get block-function :inputs [])
                     resolved-inputs (walk/postwalk-replace (get @db/port-accumulator ff) inputs)
                     fully-resolved? (= 0 (count (cset/intersection (set resolved-inputs) (set inputs))))
-                    pre-in (cond (and fully-resolved?
+                    pre-in (cond (and fully-resolved? (not is-subflow?) ;; subflows namespaced keys are not multi-inputs, but overrides
                                       is-accumulating-ports?) resolved-inputs
                                  :else data-val)
                     pre-when? (try (if (and fully-resolved? is-accumulating-ports?)
                                      (apply (get block-function :pre-when? (fn [_] true)) pre-in) ;; resolved inputs
                                      ((get block-function :pre-when? (fn [_] true)) pre-in))
                                    (catch Exception _ true))   ;; hmm, maybe false instead?
+                    ;;_ (ut/ppln [:port-accumulator ff fully-resolved? data-val (get @db/port-accumulator ff)])
+                    subflow-overrides (when is-subflow? (into {}
+                                                              (for [[k v] (dissoc (get @db/port-accumulator ff) ;data-val 
+                                                                                  :port-in?)]
+                                                                {(keyword (last (cstr/split (str (ut/unkeyword k)) #"/"))) v})))
                     expression (delay (try
-                                        (cond (not pre-when?) [:failed-pre-check :w-input pre-in] ;; failed pre-when input check
-                                              (and fully-resolved?
-                                                   is-accumulating-ports?) (apply (get block-function :fn) resolved-inputs)
+                                        (cond (not pre-when?) [:failed-pre-check :w-input pre-in] ;; failed pre-when input check - send error message
+                                              (and fully-resolved? is-subflow?) ;(and is-subflow? fully-resolved?)
+                                              (let [a (atom nil)] ;; use temp atom to hold subflow results and treat like regular fn
+                                                (flow block-function {:flow-id (str flow-id "/" (ut/unkeyword ff))
+                                                                      :debug? debug?} a ;output-chs
+                                                      subflow-overrides)
+                                                (while (nil? @a)
+                                                  (Thread/sleep 100)) @a)
+                                              (and fully-resolved? is-accumulating-ports?) (apply (get block-function :fn) resolved-inputs)
                                               block-fn-raw? (block-function data-val)
                                               block-is-port? {:port-in? true ff data-val} ;; just accumulating here?
                                               :else ((get block-function :fn) data-val))
@@ -239,6 +260,12 @@
                                               {:error (str e)}))))
                     expression-dbgn (delay (try ;; testing - to be refactored away shortly w macros
                                              (cond (not pre-when?) [:failed-pre-check :w-input pre-in] ;; failed pre-when input check
+                                                   is-subflow? (let [a (atom nil)] ;; use temp atom to hold subflow results and treat like regular fn
+                                                                 (flow block-function {:flow-id (str flow-id "/" (ut/unkeyword ff))
+                                                                                       :debug? debug?} a ;output-chs
+                                                                       subflow-overrides)
+                                                                 (while (nil? @a)
+                                                                   (Thread/sleep 100)) @a)
                                                    (and fully-resolved?
                                                         is-accumulating-ports?) (dx/dbgt_ (apply (get block-function :fn) resolved-inputs))
                                                    block-fn-raw? (dx/dbgt_ (block-function data-val))
@@ -321,8 +348,11 @@
                                                                 :color :vcolor}] vv))
                                                    (catch Exception e {:cant-eval-view-struct e :block ff})))
                     output-chs (remove nil? (cond ;; output channel, condis, or regular output switch
+                                             ; is-subflow? []
                                               (or (not pre-when?)
                                                   (not post-when?)) [] ;; failed post/pre-when, send nowhere.
+                                              (and done-channel-push?
+                                                   (seqable? done-ch)) done-ch
                                               done-channel-push? [done-ch]
                                               #_{:clj-kondo/ignore [:not-empty?]}
                                               (not (empty? condi-path)) condi-channels
@@ -460,6 +490,12 @@
                                       :let [base (ut/unkeyword (first (cstr/split (str f) #"/")))]
                                       :when (cstr/includes? (str f) "/")]
                                   [f (keyword base)])
+                components (into {} ;; todo, integrate this into the logic better. this whole binding = very "procedural"
+                                 (for [[k v] components] ;; <- sub-flow overrides need to be modeled as multi-input ports befer we proceed
+                                   {k (if (s/valid? ::network-map v)
+                                        (merge v {:inputs (vec (for [c (filter #(cstr/includes? (str %) (str k "/"))
+                                                                               (distinct (flatten connections)))]
+                                                                 (keyword (last (cstr/split (str c) #"/")))))}) v)}))
                 named-connections connections
                 connections (vec (distinct (into connections gen-connections)))
                 channels (into {} (for [conn connections] ;; TODO connection opts map for channel size, etc. Now def'd 1.
@@ -523,6 +559,7 @@
                         :let [from-val (get components bid) ;; incoming fn or static - TODO consolidate this logic w channel loops
                               static-input? (and (not (fn? from-val)) ;; not a raw fn block
                                                  (nil? (get from-val :fn)))
+                              is-subflow? (s/valid? ::network-map from-val)
                               view-mode (get-in network-map [:canvas bid :view-mode])
                               hidden1? (get-in network-map [:canvas bid :hidden?])
                               hidden? (if (and (nil? hidden1?) (ut/namespaced? bid)) true hidden1?)
@@ -544,7 +581,9 @@
                                                            :block-keypath [:view-mode]
                                                            :values (vec (remove nil? ["data" (when (get v :view) "view") "grid" "text"
                                                                                       (when (and (not static-input?) debux?) "dbgn")
-                                                                                      (when static-input? "input")]))}]}
+                                                                                      (when (and (not is-subflow?) 
+                                                                                                 static-input?) "input")]))}]}
+                                               (when is-subflow? {:subflow? true})
                                                (when static-input? {:text-input? true ;; override the view mode w input
                                                                     :view-mode "input"})
                                                (when view-mode {:view-mode view-mode}))]]
@@ -583,97 +622,102 @@
                                                              :end (System/currentTimeMillis)
                                                              :value nil
                                                              :data-type "boot"}))
-          (doseq [from (keys components)]
-            (let [start (System/currentTimeMillis)
-                  subflow-override? (not (nil? (get subflow-map from)))
-                  fn-is-subflow? (true? (and (not (nil? (get (map? (get components from)) :connections)))  ;; TODO subflow imp - Aug
-                                             (not (nil? (get (map? (get components from)) :components))))) ;; make specs for various block map shapes?
-                  from-val (if subflow-override?
-                             (get subflow-map from)
-                             (get components from))
-                  out-conns (filter #(= from (first %)) connections)
-                  in-conns (filter #(= from (second %)) connections)
-                  in-condi-conns (filter #(= from (second %)) condi-connections)
-                  to-chans (map channels (filter #(= from (first %)) connections))]
-              (pp (str "  ... Processing: " from))
+            (doseq [from (keys components)]
+              (let [start (System/currentTimeMillis)
+                    subflow-override? (not (nil? (get subflow-map from)))
+                    fn-is-subflow? (s/valid? ::network-map (get components from))
+                    from-val (if subflow-override?
+                               (get subflow-map from)
+                               (get components from))
+                    out-conns (filter #(= from (first %)) connections)
+                    in-conns (filter #(= from (second %)) connections)
+                    in-condi-conns (filter #(= from (second %)) condi-connections)
+                    to-chans (map channels (filter #(= from (first %)) connections))]
+                (pp (str "  ... Processing: " from))
 
-              (if (and (not (fn? from-val)) ;; not a raw fn
-                       (nil? (get from-val :fn))
+                (if (and (not (fn? from-val)) ;; not a raw fn
+                         (nil? (get from-val :fn))
                          ;; (not (fn? (get from-val :fn)))
-                       )
+                         (not fn-is-subflow?)) ;; make sure its not a sub-flow map / we will treat that as a fn here
+
           ;; STATIC VALUE / INPUT BLOCK - assume some static value "starting" and pass it as is
-                (let [text-input? (true? (some #(= :text-input %) (flatten [from-val])))
-                      from-val (if text-input? (last from-val) from-val)
+                  (let [text-input? (true? (some #(= :text-input %) (flatten [from-val])))
+                        from-val (if text-input? (last from-val) from-val)
                         ;from-val (get from-val :fn from-val) ;; heh. temp fix, for static blocks and pushing, refactor right before v1.0
                         ;from-val (if (get from-val :fn) (get from-val :fn) from-val)
-                      ]
-                  (when (some #(= % from) (get network-map :hide))
-                    (swap! db/hidden-values assoc-in [flow-id from-val] "***HIDDEN-FROM-UI***"))
-                  (when web-push? (rest/push! flow-id from [flow-id :blocks from :body]
-                                              (str
-                                               {:v (ut/limited from-val flow-id)})))
-                  (pp (vec (remove nil? [:block from :pushing-static-value from-val :to (vec (map last out-conns)) (when subflow-override? :subflow-value-override!)])))
-                  (swap! started conj from)
-                  (swap! db/results-atom assoc-in [flow-id from] from-val)
-                  (when web-push? ;; seeding the block history with this static value, just to be consistent, also imp for text-inputs history...
-                    (rest/push! flow-id from [flow-id :blocks from :body] {:v (ut/limited from-val flow-id)} start (System/currentTimeMillis)))
-                  (swap! db/fn-history assoc flow-id (conj (get @db/fn-history flow-id []) {:block from :from :static
-                                                                                            :path [:from :static from]
-                                                                                            :value (ut/limited from-val flow-id)
-                                                                                            :type :function
-                                                                                            :dest from
-                                                                                            :channel [from]
-                                                                                            :data-type (ut/data-typer (ut/limited from-val flow-id))
-                                                                                            :start start
-                                                                                            :end (System/currentTimeMillis)
-                                                                                            :elapsed-ms (- (System/currentTimeMillis) start)})) ;; temp modded from other, unimportant
-                  (doseq [c to-chans] (async/put! c {:sender from :value from-val})))
-
-          ;; FN BLOCK 
-                (let [;in-chans (map channels in-conns)
-                      in-chans (remove nil? (into (map channels in-conns) (map condi-channels in-condi-conns)))
-                        ;condi-chans (map condi-channels in-condi-conns)
-                      has-starter? (get from-val :starter)
-                      out-chans (map channels out-conns)
-                      from-val (if (map? from-val) ;; need to fully qualify in/out port keywords
-                                 (merge from-val
-                                        {:inputs (vec (for [i (get from-val :inputs)]
-                                                        (keyword (str (ut/unkeyword from) "/"
-                                                                      (ut/unkeyword i)))))})
-                               ;(if debux? (dx/dbgn from-val 500) from-val)
-                                 from-val)
-                      srcs (sources from)]
-                  (pp ["Creating channels for" from :-> srcs  :already-started (count (set @started)) :blocks])
-
-                  (let [] ;do ;when parents-ready? ;; placeholder
-                    (pp ["Starting block " from " with channel(s): " in-chans])
-                  ;(Thread/sleep 1000) ;; just for debugging
+                        ]
+                    (when (some #(= % from) (get network-map :hide))
+                      (swap! db/hidden-values assoc-in [flow-id from-val] "***HIDDEN-FROM-UI***"))
+                    (when web-push? (rest/push! flow-id from [flow-id :blocks from :body]
+                                                (str
+                                                 {:v (ut/limited from-val flow-id)})))
+                    (pp (vec (remove nil? [:block from :pushing-static-value from-val :to (vec (map last out-conns)) (when subflow-override? :subflow-value-override!)])))
                     (swap! started conj from)
-                    (async/thread
-                      (pp ["In thread for " from " reading from channel " in-chans])
-                      (process flow-id connections in-chans out-chans from fp from-val opts-map done-ch)))
+                    (swap! db/results-atom assoc-in [flow-id from] from-val)
+                    (when web-push? ;; seeding the block history with this static value, just to be consistent, also imp for text-inputs history...
+                      (rest/push! flow-id from [flow-id :blocks from :body] {:v (ut/limited from-val flow-id)} start (System/currentTimeMillis)))
+                    (swap! db/fn-history assoc flow-id (conj (get @db/fn-history flow-id []) {:block from :from :static
+                                                                                              :path [:from :static from]
+                                                                                              :value (ut/limited from-val flow-id)
+                                                                                              :type :function
+                                                                                              :dest from
+                                                                                              :channel [from]
+                                                                                              :data-type (ut/data-typer (ut/limited from-val flow-id))
+                                                                                              :start start
+                                                                                              :end (System/currentTimeMillis)
+                                                                                              :elapsed-ms (- (System/currentTimeMillis) start)})) ;; temp modded from other, unimportant
+                    (doseq [c to-chans] (async/put! c {:sender from :value from-val})))
 
-                  (when has-starter? ;; 95% dupe code from above - refactor TODO - used to SEED an unrun function into the flow
-                    (let [;text-input? false ;(true? (some #(= :text-input %) (flatten [from-val])))
-                            ;from-val (if text-input? (last from-val) from-val)
-                          from-val (get from-val :starter)] ;; lazy override temp for this form
-                      (when web-push? (rest/push! flow-id from [flow-id :blocks from :body] (str {:v from-val})))
-                      (pp (vec (remove nil? [:block-starter from :pushing-static-value from-val :to (vec (map last out-conns)) (when subflow-override? :subflow-value-override!)])))
+          ;; FN BLOCK / SUBFLOW BLOCK
+                  (let [;in-chans (map channels in-conns)
+                        in-chans (remove nil? (into (map channels in-conns) (map condi-channels in-condi-conns)))
+                        ;condi-chans (map condi-channels in-condi-conns)
+                        has-starter? (get from-val :starter)
+                        out-chans (map channels out-conns)
+                        tt {:inputs (vec (for [c (filter #(cstr/includes? (str %) (str from "/")) (distinct (flatten connections)))]
+                                           (keyword (last (cstr/split (str c) #"/")))))}
+                        from-val (if (map? from-val) ;(and (map? from-val) (not (s/valid? ::network-map from-val))) ;; need to fully qualify in/out port keywords
+                                   (merge from-val
+                                          {:inputs ;(if (s/valid? ::network-map from-val)
+                                                   ;  (vec (filter #(cstr/includes? (str %) (str from "/"))
+                                                   ;               (distinct (flatten connections)))) ;; "fake" ports for subflow
+                                                     (vec (for [i (get from-val :inputs)]
+                                                          (keyword (str (ut/unkeyword from) "/"
+                                                                        (ut/unkeyword i)))))})
+                               ;(if debux? (dx/dbgn from-val 500) from-val)
+                                   from-val)
+                        srcs (sources from)]
+                    (pp ["Creating channels for" from :-> srcs  :already-started (count (set @started)) :blocks])
+
+                    (let [] ;do ;when parents-ready? ;; placeholder
+                      (pp ["Starting block " from " with channel(s): " in-chans])
+                  ;(Thread/sleep 1000) ;; just for debugging
                       (swap! started conj from)
-                      (swap! db/results-atom assoc-in [flow-id from] from-val)
-                      (when web-push? ;; seeding the block history with this static value, just to be consistent, also imp for text-inputs history...
-                        (rest/push! flow-id from [flow-id :blocks from :body] {:v from-val} start (System/currentTimeMillis)))
-                      (swap! db/fn-history assoc flow-id (conj (get @db/fn-history flow-id []) {:block from :from :starter
-                                                                                                :path [:from :starter from]
-                                                                                                :value (ut/limited from-val flow-id)
-                                                                                                :type :function
-                                                                                                :dest from
-                                                                                                :channel [from]
-                                                                                                :data-type (ut/data-typer (ut/limited from-val flow-id))
-                                                                                                :start start
-                                                                                                :end (System/currentTimeMillis)
-                                                                                                :elapsed-ms (- (System/currentTimeMillis) start)})) ;; temp modded from other, unimportant
-                      (doseq [c to-chans] (async/put! c {:sender from :value from-val})))))))))
+                      (async/thread
+                        (pp ["In thread for " from " reading from channel " in-chans])
+                        (process flow-id connections in-chans out-chans from fp from-val opts-map done-ch)))
+
+                    (when has-starter? ;; 95% dupe code from above - refactor TODO - used to SEED an unrun function into the flow
+                      (let [;text-input? false ;(true? (some #(= :text-input %) (flatten [from-val])))
+                            ;from-val (if text-input? (last from-val) from-val)
+                            from-val (get from-val :starter)] ;; lazy override temp for this form
+                        (when web-push? (rest/push! flow-id from [flow-id :blocks from :body] (str {:v from-val})))
+                        (pp (vec (remove nil? [:block-starter from :pushing-static-value from-val :to (vec (map last out-conns)) (when subflow-override? :subflow-value-override!)])))
+                        (swap! started conj from)
+                        (swap! db/results-atom assoc-in [flow-id from] from-val)
+                        (when web-push? ;; seeding the block history with this static value, just to be consistent, also imp for text-inputs history...
+                          (rest/push! flow-id from [flow-id :blocks from :body] {:v from-val} start (System/currentTimeMillis)))
+                        (swap! db/fn-history assoc flow-id (conj (get @db/fn-history flow-id []) {:block from :from :starter
+                                                                                                  :path [:from :starter from]
+                                                                                                  :value (ut/limited from-val flow-id)
+                                                                                                  :type :function
+                                                                                                  :dest from
+                                                                                                  :channel [from]
+                                                                                                  :data-type (ut/data-typer (ut/limited from-val flow-id))
+                                                                                                  :start start
+                                                                                                  :end (System/currentTimeMillis)
+                                                                                                  :elapsed-ms (- (System/currentTimeMillis) start)})) ;; temp modded from other, unimportant
+                        (doseq [c to-chans] (async/put! c {:sender from :value from-val})))))))))
           (catch Exception e (ut/ppln {:flow-error e})))))
     (catch clojure.lang.ExceptionInfo e
           ; Printing only the exception message and not lots of useless garbage
@@ -702,8 +746,8 @@
                                               (when (not valid?)
                                                 spec-demangle))])
     (catch Exception e (do (ut/ppln [:incoming-live-flow :error value (str e)])
-                         [:live-flow-return [:live-flow-return] {:error (str e)
-                                                                 :received (System/currentTimeMillis)}]))))
+                           [:live-flow-return [:live-flow-return] {:error (str e)
+                                                                   :received (System/currentTimeMillis)}]))))
 
 (defn flow-results [] ;; somewhat pointless, but hey. TODO
   (into {}
@@ -734,6 +778,7 @@
 ;(flow fex/color-art-flow) 
 ;(flow fex/ecosystem-flow) 
 ;(flow fex/etl-flow) 
+;(flow fex/sub-flow)
 ;(flow fex/openai-calls {:flow-id "openai-history-loop"})
 ;(flow bad-sample-flow)
 ;(flow (flow> 10 + #(* 2 %) - #(+ 10 %) (fn [x] (str x "!"))))

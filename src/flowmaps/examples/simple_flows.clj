@@ -36,6 +36,7 @@
                                       (not (= prompt @last-prompt)))
                          :inputs [:prompt :openai-api-key :history]}
                 :last-response (fn [x] x) ;; just to have a data block for the UI
+                :last-answer (fn [x] (get-in x [:answer :choices 0 :message :content]))
                 :memory {:fn (fn [{:keys [question history answer]}]
                                (let [aa (get-in answer [:choices 0 :message])]
                                  (conj history aa)))
@@ -45,12 +46,14 @@
                    ;; canned REST / sub-flow endpoints 
    :points {"question" [[:prompt :ai-ask/prompt] ;; (channel to insert into)
                         [:ai-ask :memory]]} ;; (channel to snatch out of downstream)
-                            ;; ^^ send question, get answer (keeps convo state)
+   ;; ^^ send question, get answer (keeps convo state)
    :hide [:openai-api-key]
    :connections [[:prompt :ai-ask/prompt]
                  [:openai-api-key :ai-ask/openai-api-key]
                  [:ai-ask :memory]
                  [:ai-ask :last-response]
+                 [:last-response :last-answer]
+                 [:last-answer :done]
                  [:memory :ai-ask/history]]
    :canvas {:ai-ask/openai-api-key {:x 430 :y 430 :h 255 :w 240 :view-mode "text" :hidden? true}
             :ai-ask/prompt {:x 430 :y 100 :h 255 :w 240 :view-mode "text" :hidden? true}
@@ -64,6 +67,104 @@
                                :x 2585 :y 984 :h 215 :w 400}
             "just-the-question" {:inputs [[:last-response [:text [:map [:v :question :content]]]]]
                                  :x 2575 :y 577 :h 215 :w 400}}})
+
+(def ask-buffy
+  {:description "simple chat call"
+   :components {:prompt "Top O' the morning!"
+                :openai-api-key (System/getenv "OAI_KEY")
+                :ai-ask {:fn (fn [prompt openai-api-key history]
+                               (let [question {:role "user"
+                                               :content (str prompt)}]
+                                 {:question question
+                                  :history (vec (conj history question))
+                                  :answer (clojure.walk/keywordize-keys
+                                           (clojure.data.json/read-str
+                                            (get (clj-http.client/post
+                                                  "https://api.openai.com/v1/chat/completions"
+                                                  {:body (clojure.data.json/write-str
+                                                          {:model "gpt-4"
+                                                           :messages (vec (conj history question))})
+                                                   :headers {"Content-Type" "application/json"
+                                                             "Authorization" (str "Bearer " openai-api-key)}
+                                                   :socket-timeout 300000
+                                                   :connection-timeout 300000
+                                                   :content-type :json
+                                                   :accept :json}) :body)))}))
+                         :inputs [:prompt :openai-api-key :history]}
+                :last-response (fn [x] (get-in x [:answer :choices 0 :message :content]))
+                :memory [{:role "system" ;; ""bootstrap"" history with sys prompt
+                          :content "You are a helpful assistant, you responses will be framed as if you are Buffy from the 1992 film."}]}
+   :hide [:openai-api-key]
+   :connections [[:prompt :ai-ask/prompt]
+                 [:memory :ai-ask/history]
+                 [:openai-api-key :ai-ask/openai-api-key]
+                 [:ai-ask :last-response]
+                 [:last-response :done]]
+   :speak (fn [x] (str x)) ;; speak as a base level key for subflow usage (since it will be treated as a fn!)
+   :canvas {:ai-ask/openai-api-key
+            {:x 430 :y 430 :h 255 :w 240 :view-mode "text" :hidden? true}
+            :ai-ask/prompt {:x 430 :y 100 :h 255 :w 240 :view-mode "text" :hidden? true}
+            :ai-ask/history {:x 466 :y 962 :h 350 :w 894 :view-mode "text" :hidden? true}
+            :memory {:x -199 :y 750 :h 369 :w 538 :view-mode "data"}
+            :openai-api-key {:x -243 :y 505 :h 141 :w 565 :view-mode "input"}
+            :prompt {:x -136 :y 145 :h 212 :w 415 :view-mode "input"}
+            :last-response {:x 1504 :y 373 :h 366 :w 489 :view-mode "text"}
+            :ai-ask {:x 701 :y 278 :h 510 :w 597 :view-mode "text"}}})
+
+;; subflow test
+(def sub-flow {:description "Flow within a flow"
+               :components {:comp1 10
+                            :comp2 20
+                            :comp3 [133 45]
+                            :simple-plus-10 #(+ 10 %)
+                            :subflow {:components {:comp1 10
+                                                   :comp2 20
+                                                   :simple-plus-10 #(+ 10 %)
+                                                   :adder {:fn +
+                                                           :inputs [:in1 :in2]}}
+                                      :connections [[:comp1 :adder/in1]
+                                                    [:comp2 :adder/in2]
+                                                    [:adder :simple-plus-10]
+                                                    [:simple-plus-10 :done]]
+                                      :canvas {:comp1 {:x 100 :y 100 :h 255 :w 240 :view-mode "data"}
+                                               :adder/in1 {:x 518 :y 133 :h 202 :w 225 :view-mode "data" :hidden? true}
+                                               :comp2 {:x 100 :y 430 :h 255 :w 240 :view-mode "data"}
+                                               :adder/in2 {:x 496 :y 459 :h 202 :w 269 :view-mode "data" :hidden? true}
+                                               :adder {:x 971 :y 358 :h 255 :w 240 :view-mode "data"}
+                                               :simple-plus-10 {:x 1310 :y 298 :h 507 :w 669 :view-mode "data"}}}
+                            :ask-buffy ask-buffy
+                            :add-one #(+ 1 %)
+                            :add-hundred #(+ 100 %)
+                            :adder-one {:fn #(apply + %)
+                                        :inputs [:in]}
+                            :adder {:fn +
+                                    :inputs [:in1 :in2]}}
+               :connections [[:comp1 :adder/in1]
+                             [:comp2 :adder/in2]
+                             [:comp3 :adder-one/in]
+                             [:adder-one :add-one]
+                             [:adder :simple-plus-10]
+                             [:add-one :subflow/comp2]
+                             [:simple-plus-10 :subflow/comp1]
+                             [:subflow :add-hundred]
+                             [:add-hundred :ask-buffy/prompt]
+                             [:ask-buffy :done]]
+               :canvas {:adder-one {:x 791 :y 764 :h 255 :w 240 :view-mode "data"}
+                        :ask-buffy/prompt {:x 760 :y 1750 :h 255 :w 240 :view-mode "data" :hidden? true}
+                        :add-hundred {:x 2493 :y 694 :h 255 :w 240 :view-mode "data"}
+                        :add-one {:x 1123 :y 785 :h 209 :w 250 :view-mode "data"}
+                        :subflow {:x 1979 :y 619 :h 332 :w 335 :view-mode "data"}
+                        :adder-one/in {:x 449 :y 789 :h 196 :w 225 :view-mode "data" :hidden? true}
+                        :comp2 {:x 100 :y 430 :h 255 :w 240 :view-mode "data"}
+                        :comp3 {:x 97 :y 791 :h 203 :w 251 :view-mode "data"}
+                        :adder/in1 {:x 430 :y 100 :h 255 :w 240 :view-mode "data" :hidden? true}
+                        :comp1 {:x 100 :y 100 :h 255 :w 240 :view-mode "data"}
+                        :adder {:x 862 :y 307 :h 225 :w 278 :view-mode "data"}
+                        :simple-plus-10 {:x 1260 :y 363 :h 220 :w 250 :view-mode "data"}
+                        :ask-buffy {:x 2955 :y 711 :h 255 :w 240 :view-mode "text"}
+                        :subflow/comp2 {:x 1608 :y 843 :h 161 :w 208 :view-mode "data" :hidden? true}
+                        :adder/in2 {:x 430 :y 430 :h 255 :w 240 :view-mode "data" :hidden? true}
+                        :subflow/comp1 {:x 1627 :y 548 :h 166 :w 217 :view-mode "data" :hidden? true}}})
 
 (def my-network {:description "a simple example flow: addition and integers"
                  :components {:comp1 10
