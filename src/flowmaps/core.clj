@@ -475,7 +475,7 @@
               (not (true? @web/websocket?))        ;; - web ui is NOT running
               (not (get opts-map :debug? true)))   ;; - debug is NOT enabled
           ;(get opts-map :close? false))       ;; - close channels opt?
-          (doseq [[k c] (get @db/channels-atom flow-id)]        ;; * will be fixed with the concurrent flow / subflow / flow-id changes coming next
+          (doseq [[k c] (get @db/channels-atom flow-id)]
             (try #_{:clj-kondo/ignore [:redundant-do]}
              (do (ut/ppln [:closing-channel k c])
                  (async/close! c)) (catch Exception e (ut/ppln [:error-closing-channel e k c])))))
@@ -761,7 +761,11 @@
              (ut/ppln {:resolved-paths-end-values res})
              res)})))
 
-(defn close-channels! [flow-id] nil) ;; TODO when :close meta block implemented next
+(defn close-channels! [flow-id]
+  (doseq [[k c] (get @db/channels-atom flow-id)]
+    (try #_{:clj-kondo/ignore [:redundant-do]}
+     (do (ut/ppln [:closing-channel k c])
+         (async/close! c)) (catch Exception e (ut/ppln [:error-closing-channel e k c])))))
 
 ;; snippets for testing
 ;(web/start!) ;; boots the webserver and socket server - TODO, will be a fn to start the REST server by itself w/o dev UI
