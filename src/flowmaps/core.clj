@@ -779,6 +779,7 @@
 ;(flow fex/ecosystem-flow) 
 ;(flow fex/etl-flow) 
 ;(flow fex/sub-flow)
+;(flow fex/ask-buffy {:flow-id "ask-buffy"})
 ;(flow fex/openai-calls {:flow-id "openai-history-loop"})
 ;(flow bad-sample-flow)
 ;(flow (flow> 10 + #(* 2 %) - #(+ 10 %) (fn [x] (str x "!"))))

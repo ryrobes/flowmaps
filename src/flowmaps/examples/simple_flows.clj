@@ -43,7 +43,7 @@
                          :speak (fn [x] (str (get (last x) :content))) ;; if in Rabbit, and ElevenLabs KEY, read the answer
                          :starter [{:role "system" ;; ""bootstrap"" history with sys prompt
                                     :content "You are a helpful assistant, you responses will be framed as if you are Buffy from the 1992 film."}]}}
-                   ;; canned REST / sub-flow endpoints 
+   ;; canned REST / sub-flow endpoints 
    :points {"question" [[:prompt :ai-ask/prompt] ;; (channel to insert into)
                         [:ai-ask :memory]]} ;; (channel to snatch out of downstream)
    ;; ^^ send question, get answer (keeps convo state)
@@ -91,16 +91,19 @@
                                                    :content-type :json
                                                    :accept :json}) :body)))}))
                          :inputs [:prompt :openai-api-key :history]}
-                :last-response (fn [x] (get-in x [:answer :choices 0 :message :content]))
+                :last-response {:fn (fn [x] (get-in x [:answer :choices 0 :message :content]))
+                                :speak (fn [x] (str x))}
                 :memory [{:role "system" ;; ""bootstrap"" history with sys prompt
                           :content "You are a helpful assistant, you responses will be framed as if you are Buffy from the 1992 film."}]}
+      ;; canned REST / sub-flow endpoints 
+   :points {"question" [[:prompt :ai-ask/prompt] [:last-response :done]]}
    :hide [:openai-api-key]
    :connections [[:prompt :ai-ask/prompt]
                  [:memory :ai-ask/history]
                  [:openai-api-key :ai-ask/openai-api-key]
                  [:ai-ask :last-response]
                  [:last-response :done]]
-   :speak (fn [x] (str x)) ;; speak as a base level key for subflow usage (since it will be treated as a fn!)
+   :speak (fn [x] (str x)) ;; will speak when treated as a subflow only (since it will be treated as a fn!)
    :canvas {:ai-ask/openai-api-key
             {:x 430 :y 430 :h 255 :w 240 :view-mode "text" :hidden? true}
             :ai-ask/prompt {:x 430 :y 100 :h 255 :w 240 :view-mode "text" :hidden? true}

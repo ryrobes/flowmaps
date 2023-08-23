@@ -89,7 +89,8 @@
     (catch Exception e {:error (str e)})))
 
 (defn flow-point-push [request]
-  (let [point-id (get-in request [:path-params :point-id])
+  (try 
+    (let [point-id (get-in request [:path-params :point-id])
         flow-id (get-in request [:path-params :flow-id])
         point-data (get-in @db/working-data [flow-id :points point-id])
         time-key (System/currentTimeMillis)
@@ -111,7 +112,8 @@
                     :error (get return :error)
                     :return-channel return-channel}
           error? (get return :error)]
-      (send-edn (if error? err-base base)))))
+      (send-edn (if error? err-base base))))
+      (catch Exception e (send-edn {:error! (str e)})))) ;; TODO, full errors (cant find channel, cant find flow, cant find point)
 
 (defn flow-value-push [request]
   (if (get-in request [:edn-params :return]) ;; are we picking up a channel val to return?

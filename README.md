@@ -34,6 +34,10 @@
         * [Sub-flows!](#sub-flows)
         * [:pre-when? and :post-when?](#pre-when-and-post-when)
         * [Pre-run "starter" values for functions](#pre-run-starter-values-for-functions)
+        * [channel REST access / pre-configured endpoints with :points (WIP)](#channel-rest-access--pre-configured-endpoints-with-points-wip)
+            * [Push only](#push-only)
+            * [Push and fetch (wait)](#push-and-fetch-wait)
+            * [pre-configured <em>named</em> endpoints - :points](#pre-configured-named-endpoints---points)
         * [Hiding sensitive values from the UI (API Keys, passwords, etc)](#hiding-sensitive-values-from-the-ui-api-keys-passwords-etc)
         * [Optional block "canvas" metadata](#optional-block-canvas-metadata)   
 
@@ -561,6 +565,62 @@ You'll also notice that we save the "view mode" for each block, which can be hel
            :adder {:x 768 :y 413 :h 255 :w 240 :view-mode "data"}
            :simple-plus-10 {:x 1111 :y 419 :h 255 :w 240 :view-mode "data"}}}
 ```
+
+## channel REST access / pre-configured endpoints with :points (WIP)
+
+We've already shown a number of ways to interact with the channels of a "running" flow (I put running in quotes since nothing is really _running_ but we have channels open, idle, and _listening_ for values that will cause a _reaction_ / execution - semantics, I guess) - why not add one more? 
+
+By default, when the webserver is running each channel can be pushed to via REST calls with EDN. It comes in 3 flavors.
+
+### Push only
+Send an arbitrary value to a channel (you'll see the reactions on Rabbit or the console / you application flow, etc).
+```bash
+curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d  '{:value "what is a marmot?" :channel [:prompt :ai-ask/prompt]}' http://localhost:8888/flow-value-push/<my-flow-id> | ./edn
+```
+_(replace \<my-flow-id> with the target flow)_
+
+The data body is pretty straightforward.
+```clojure
+{:value "what is a marmot?"          ;; literal value you want to push
+ :channel [:prompt :ai-ask/prompt]}  ;; target channel
+```
+
+### Push and fetch (wait)
+Send an arbitrary value to a channel and also WAIT for a return... from any downstream channel of the insertion.
+```bash
+curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d  '{:value "when is the next full moon?" :channel [:prompt :ask-buffy/prompt] :return [:ask-buffy :just-answer]}' http://localhost:8888/flow-value-push/<my-flow-id> | ./edn
+```
+Again, fairly straightforward - we send the value and then specify which channel to listen on to snatch a return value from.
+```clojure
+{:value "when is the next full moon?"  ;; literal value you want to push
+:channel [:prompt :ask-buffy/prompt]   ;; target channel
+:return [:ask-buffy :just-answer]}     ;; what "eventual" value from channel to return?
+```
+You might have noticed that Rabbit provides cut-and-paste snippets for all channels when you expand a channel in the left-hand panel - a CURL example REST command is included.
+
+![rabbit web ui](https://app.rabbitremix.com/buffy-rest.png)
+
+### pre-configured _named_ endpoints - :points
+Alternatively, if this is a feature that you will be using often, it can be nice to have a few canned configurations.
+```clojure
+;; as a base level flowmaps key (on the same level as :connections and :components)
+...
+   :points {"question" [[:prompt :ai-ask/prompt]  ;; name of endpoint as key + channel to insert into
+                        [:last-response :done]]}       ;; channel to snatch out of downstream
+...
+```
+Now, with this, we can make that same call simply with:
+```bash
+curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d  '"When is the next full moon?"' http://localhost:8888/flowpoint/<my-flow-id>/question | ./edn
+```
+Here we can just call the named endpoint _question_ with the flow-id and get our answer.
+
+![rabbit web ui](https://app.rabbitremix.com/buffy-rest2.png)
+
+i.e.
+
+![rabbit web ui](https://app.rabbitremix.com/buffy-rest3.png)
+
 
 ## Writing a flow from the Rabbit canvas
 
