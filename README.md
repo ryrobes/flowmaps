@@ -24,13 +24,17 @@
 
 * [Getting started (Start Here!)](#how-to-get-started)
    * [Basics](#basics---from-the-repl-w-lein)
-   * ["Curiouser and curiouser!" cried Alice](#curiouser-and-curiouser-cried-alice)
+   * ["Curiouser and curiouser!"](#curiouser-and-curiouser-cried-alice)
         * [Conditional Paths](#conditional-paths)
         * [Optional block "views"](#optional-block-views)
         * [Static value inputs](#static-value-inputs)
         * [Optional block "speak" / text-to-speech](#optional-block-speak--text-to-speech)
         * [Grid data / "rowsets"](#grid-data--rowsets)
-        * [More on multi-input Blocks (input "ports")](#more-on-multi-input-blocks-input-ports)
+        * [Multi-input Blocks (i.e. input "ports")](#more-on-multi-input-blocks-input-ports)
+        * [Sub-flows!](#sub-flows)
+        * [:pre-when? and :post-when?](#pre-when-and-post-when)
+        * [Pre-run "starter" values for functions](#pre-run-starter-values-for-functions)
+        * [Hiding sensitive values from the UI (API Keys, passwords, etc)](#hiding-sensitive-values-from-the-ui-api-keys-passwords-etc)
         * [Optional block "canvas" metadata](#optional-block-canvas-metadata)   
 
 * [Features](#core-flow-runner-features)
@@ -152,9 +156,9 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 
         ```clojure
         (fm/flow first-flow 
-        {:debug? false} 
-         my-results 
-        {:starting 42069}) ;; a map with block names and override values
+          {:debug? false} 
+           my-results 
+          {:starting 42069}) ;; a map with block names and override values
 
         @my-results        ;; ==> 42080
         ```
@@ -499,7 +503,43 @@ Simply use a base key called :hide with a vector of all the blocks that contain 
 
 Note: this does not impact the actual flow of data, just the web UI representation of it.
 
+## Sub-flows!
 
+Not only can a block be a function or a static value - it can also be another flowmap! Just insert it as the block body and in the connections block reference them as if they were simply function inputs!
+
+Consider this flow.
+
+```clojure
+{:components {:comp1 10
+              :comp2 20
+              :comp3 [133 45]
+              :simple-plus-10 #(+ 10 %)
+              :subflow {:components {:comp1 10 ;; base value will be overwritten
+                                     :comp2 20 ;; base value will be overwritten
+                                     :simple-plus-10 #(+ 10 %)
+                                     :adder {:fn + :inputs [:in1 :in2]}}
+                        :connections [[:comp1 :adder/in1]
+                                      [:comp2 :adder/in2]
+                                      [:adder :simple-plus-10]
+                                      [:simple-plus-10 :done]]} ;; :done is needed for subflows for a return!
+              :exclaim #(str "It's " % "!")
+              :add-one #(+ 1 %)
+              :add-hundred #(+ 100 %)
+              :adder-one {:fn #(apply + %) :inputs [:in]}
+              :adder {:fn + :inputs [:in1 :in2]}}
+ :connections [[:comp1 :adder/in1]
+               [:comp2 :adder/in2]
+               [:comp3 :adder-one/in]
+               [:adder-one :add-one]
+               [:adder :simple-plus-10]
+               [:add-one :subflow/comp2]        ;; subflow override
+               [:simple-plus-10 :subflow/comp1] ;; subflow override
+               [:subflow :add-hundred]          ;; out of subflow/done
+               [:add-hundred :exclaim]
+               [:exclaim :done]]}
+```
+
+![1rabbit web ui](https://app.rabbitremix.com/subflows.png)
 
 ## Optional block "canvas" metadata
 
@@ -892,7 +932,7 @@ This is a great way to interact with the flow once it's been booted up. The chan
 - ~~:flow-id for each run to allow concurrent flows w/o clashing (will also fix a closing channel bug)~~
     ~~- rabbit-ui will need to allow the user to choose which "loaded / running flow" to render and interact with (see "sub-flows" below)~~
 - :cljs-view option for ClojureScript views that get compiled on the front-end instead of the back end. Opens up some more interactivity options for view blocks.
-- subflows! essentially a block that is an entire other flow with some "input overrides" that flow in from the "parent flow". Almost like a visual function that can be examined using the rabbit-ui as it's own flow. (sub)flow-maps as blocks opens up a really interesting world of re-usability...
+~~- subflows! essentially a block that is an entire other flow with some "input overrides" that flow in from the "parent flow". Almost like a visual function that can be examined using the rabbit-ui as it's own flow. (sub)flow-maps as blocks opens up a really interesting world of re-usability...~~
 - flowmaps.io as an open "library" of blocks, flow, function snippets to add to your flows or play around with (actual way it will work TBD)
     - this will allow me to focus this repo on the core backend library instead of shoehorning all kinds of rando stuff in there that most people won't use, although I'm def not against the creation of "core primitive" block types for a basic set of CLJ fns shorthand that ships out of the box (perhaps even going as far as packaging SQL, JDBC, etc). TBD!
     - some simple examples
@@ -902,7 +942,7 @@ This is a great way to interact with the flow once it's been booted up. The chan
 - meta :connection pathways for errors. i.e. each block will have an implicit error output port :block-name/error that can be handled *in* the flow user-space instead of killing the flow chain (as it does currently)
 - fix bugs! remove weirdness! (please open issues with example flows to repro when you find them)
 - some shortcuts for (not) using :done blocks (optional *implied* done, instead of *explicitly linked*)
-- rabbit-ui "block assembly". 
+- rabbit-ui "block assembly"? 
     - The ability to (given a set of starting block defs) use the UI to drag in blocks, connect them, alter their values, test the block functions (disconnectedly with arbitrary values if need be), and then copy-pasta that finished flow-map back to your application
         - *I say copy-pasta back because that way YOU are in control instead of me having some other system of persisted DB data that you need to contend with. Some optional feature like that may exist in the future (persistent flow-db w time-travel, etc), but the **simple way**, I think, is **always** just giving you the flow "source" to re-use as you see fit.
 - rendering multi "input ports" differently? Currently rabbit shows them as their own blocks being ingested - which is the easiest way to view and understand them, but conceptually they are just child nodes of the parent block and not their own entities... TBD
