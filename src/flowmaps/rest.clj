@@ -1,4 +1,5 @@
 (ns flowmaps.rest
+  (:refer-clojure :exclude [abs update-vals update-keys])
   (:require [clojure.string :as cstr]
             [clojure.edn :as edn]
             [flowmaps.db :as db]
@@ -16,24 +17,33 @@
 
 (defn push! [flow-id block-id keypath values & [ts tse]] ;; for default subscription queue usage (soon deprecated due to channel-history?)
   (let [bd (try (get-in @db/block-defs [flow-id (nth keypath 2)]) (catch Exception _ nil))
+        rewind (get-in @db/working-data [flow-id :rewinds])
+        rewind-limit? (not (= rewind 0))
         tse (when tse (if (= ts tse) (+ tse 2) tse)) ;; add 2 ms for viz purposes! TODO document
-        tsh (vec (distinct (conj (conj (get-in @db/block-dump [flow-id :ts-history] []) ts) tse)))
-        tshe (conj (get-in @db/block-dump [flow-id :ts-history2] []) [ts tse])]
+        tsh-full (vec (sort (distinct (conj (conj (get-in @db/block-dump [flow-id :ts-history] []) ts) tse))))
+        tsh (if rewind-limit? 
+              ;(take-last rewind (vec tsh-full))
+              (take rewind (reverse tsh-full))
+              tsh-full)
+        ;tsh tsh-full
+        ]
     (swap! db/block-dump assoc-in keypath values) ;; populate block-dump atom incrementally
     (when (and ts tse) ;; supplemental dump keys - only want history entries, not rando key changes
       #_{:clj-kondo/ignore [:redundant-do]}
       (do  ;; ^ again. *not* redundant here.
         (swap! db/block-dump assoc-in [flow-id :block-history block-id]
-               (conj (get-in @db/block-dump [flow-id :block-history block-id] [])
-                     {:start ts :end tse :body values}))
-        (swap! db/block-dump assoc-in [flow-id :ts-history] tsh)
-        (swap! db/block-dump assoc-in [flow-id :ts-history2] tshe)))
+               (conj
+                (if rewind-limit? (vec (take-last rewind (sort-by :start (get-in @db/block-dump [flow-id :block-history block-id] []))))
+                    (get-in @db/block-dump [flow-id :block-history block-id] []))
+                {:start ts :end tse :body values}))
+        (swap! db/block-dump assoc-in [flow-id :ts-history] tsh)))
     (when (and ts bd)
       (swap! db/waffle-data assoc flow-id
-             (conj (get @db/waffle-data flow-id)
+             (conj (if rewind-limit? (vec (take-last rewind (sort-by :start (get @db/waffle-data flow-id))))
+                                  (get @db/waffle-data flow-id))
                    {:name (str (nth keypath 2)) :type (ut/data-typer (get values :v)) :start ts :end tse
                     :number (count (filter #(= (get % :name) (str (nth keypath 2))) (get @db/waffle-data flow-id)))})))
-    (swap! db/web-push-history conj {:kp keypath :flow-id flow-id :values values :start ts :end tse :block-def bd :block-id (get keypath 2)})
+    ;(swap! db/web-push-history conj {:kp keypath :flow-id flow-id :values values :start ts :end tse :block-def bd :block-id (get keypath 2)})
     ;(swap! queue-atom conj [flow-id keypath values ts tse (str bd)]) ;; actual sub queue (deprecated?) 
     ))
 
@@ -69,8 +79,8 @@
        [[:pushed flow-id channel-name] value]))))
 
 ;; test
-;; curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d '{:value 45 :channel [:int1 :adder/in1]}' http://localhost:8888/flow-value-push/odds-and-evens
-;; curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d '{:value 44 :channel [:int1 :adder/in1] :return [:display-val :done]}' http://localhost:8888/flow-value-push/odds-and-evens
+;; curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d '{:value 45 :channel [:int1 :adder/in1]}' http://localhost:8000/flow-value-push/odds-and-evens
+;; curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d '{:value 44 :channel [:int1 :adder/in1] :return [:display-val :done]}' http://localhost:8000/flow-value-push/odds-and-evens
 
 (defn wait-for-event [channel flow-id start-time timeout-ms]
   (try

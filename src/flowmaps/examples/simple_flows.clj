@@ -1,4 +1,5 @@
 (ns flowmaps.examples.simple-flows
+  (:refer-clojure :exclude [abs update-vals update-keys])
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.string :as cstr]
             [clojure.walk :as walk]
@@ -71,7 +72,7 @@
 (def ask-buffy
   {:description "simple chat call"
    :components {:prompt "Top O' the morning!"
-                :openai-api-key (System/getenv "OAI_KEY")
+                :openai-api-key (let [k (System/getenv "OAI_KEY")] (if (not (empty? k)) k "missing OAI_KEY var!"))
                 :ai-ask {:fn (fn [prompt openai-api-key history]
                                (let [question {:role "user"
                                                :content (str prompt)}]
@@ -90,7 +91,20 @@
                                                    :connection-timeout 300000
                                                    :content-type :json
                                                    :accept :json}) :body)))}))
-                         :inputs [:prompt :openai-api-key :history]}
+                         :inputs [:prompt :openai-api-key :history]
+                         :view (fn [x] [:markdown [(str "## " (get-in x [:question :content]))
+                                                   (str "## " (get-in x [:answer :choices 0 :message :content]))] {:color "orange"}])
+                         :pre-print (fn [prompt _ _] [:question prompt])
+                         :post-print (fn [x] [:answer (get-in x [:answer :choices 0 :message :content])])
+                         :doc ["### Ask Buffy!" 
+                               "#### She can be totally helpful, kinda. Sometimes." ;"---"
+                               "#### Block requires 3 inputs"
+                               "#### *prompt*" 
+                               "######   - The question to ask / prompt string."
+                               "#### *openai-api-key*" 
+                               "######   - Your OpenAI API key."
+                               "#### *history*" 
+                               "######   - Either a starter set of messages / system prompts, or the feedback loop of recursive chat histories."]}
                 :last-response {:fn (fn [x] (get-in x [:answer :choices 0 :message :content]))
                                 :speak (fn [x] (str x))}
                 :memory [{:role "system" ;; ""bootstrap"" history with sys prompt
@@ -113,6 +127,106 @@
             :prompt {:x -136 :y 145 :h 212 :w 415 :view-mode "input"}
             :last-response {:x 1504 :y 373 :h 366 :w 489 :view-mode "text"}
             :ai-ask {:x 701 :y 278 :h 510 :w 597 :view-mode "text"}}})
+
+(def memory-watcher
+  {:components {:go {:fn (fn [x] x)
+                     :starter 0}
+                :check {:fn (fn [_] {:memory (flowmaps.utility/get-memory-usage)
+                                     :threads (flowmaps.utility/get-thread-count)})}
+                :memory (fn [data]
+                          (let [data (dissoc (get-in data [:memory :heap-usage]) :max)
+                                tick (System/currentTimeMillis)]
+                            (defonce mdata (atom []))
+                            (reset! mdata (conj (vec @mdata) data))
+                            (take-last 300 (mapcat (fn [entry idx]
+                                                     (map (fn [[k v]] {:index idx :type (name k) :value v}) entry))
+                                                   (vec @mdata) (range)))))
+                :threads (fn [data]
+                           (let [data (dissoc (get data :threads) :total-started)
+                                 tick (System/currentTimeMillis)]
+                             (defonce vdata (atom []))
+                             (reset! vdata (conj (vec @vdata) data))
+                             (take-last 300 (mapcat (fn [entry idx]
+                                                      (map (fn [[k v]] {:index idx :type (name k) :value v}) entry))
+                                                    (vec @vdata) (range)))))
+                :view-memory {:fn (fn [x] x)
+                              :view (fn [x] [:vega-lite
+                                             {:data {:values x}
+                                              :mark {:type "line" :interpolate "monotone"}
+                                              :encoding
+                                              {:x {:field "index"
+                                                   :type "nominal"
+                                                   :axis {:title "Ticks"}}
+                                               :y {:field "value"
+                                                   :type "quantitative"
+                                                   :axis {:title "Memory (MB)"}}
+                                               :color {:field "type"
+                                                       :type "nominal"
+                                                       :scale {:scheme "pastel2"}
+                                                       :legend {:title "Memory Type"}}}
+                                              :padding {:top 15 :left 15}
+                                              :width "container"
+                                              :height :height-int
+                                              :background "transparent"
+                                              :config {:style {"guide-label" {:fill "#ffffff77"}
+                                                               "guide-title" {:fill "#ffffff77"}}
+                                                       :view {:stroke "#00000000"}
+                                                       :axis {:gridColor "#ffffff13"
+                                                              :domainColor "#ffffff13"
+                                                              :gridWidth 3
+                                                              :tickWidth 2
+                                                              :labelColor "#ffffff77"
+                                                              :titleColor "#ffffff77"}}}])}
+                :view-threads {:fn (fn [x] x)
+                               :view (fn [x] [:vega-lite
+                                              {:data {:values x}
+                                               :mark {:type "line" :interpolate "monotone"}
+                                               :encoding
+                                               {:x {:field "index"
+                                                    :type "nominal"
+                                                    :axis {:title "Ticks"}}
+                                                :y {:field "value"
+                                                    :type "quantitative"
+                                                    :axis {:title "Threads"}}
+                                                :color {:field "type"
+                                                        :type "nominal"
+                                                        :scale {:scheme "paired"}
+                                                        :legend {:title "Type"}}}
+                                               :padding {:top 15 :left 15}
+                                               :width "container"
+                                               :height :height-int
+                                               :background "transparent"
+                                               :config {:style {"guide-label" {:fill "#ffffff77"}
+                                                                "guide-title" {:fill "#ffffff77"}}
+                                                        :view {:stroke "#00000000"}
+                                                        :axis {:gridColor "#ffffff13"
+                                                               :domainColor "#ffffff13"
+                                                               :gridWidth 3
+                                                               :tickWidth 2
+                                                               :labelColor "#ffffff77"
+                                                               :titleColor "#ffffff77"}}}])}
+                :wait-a-minute (fn [x] (do (defonce cnt (atom 0))
+                                           (Thread/sleep 2000) (swap! cnt inc) @cnt))}
+   :limit 1200 ;; !!! override the web-ui row limit 
+   :rewinds 1 ;; levels of rewind history per block (effects waffle charts as well)
+   :connections [[:go :check]
+                 [:check :wait-a-minute]
+                 [:check :memory]
+                 [:check :threads]
+                 [:threads :view-threads]
+                 [:memory :view-memory]
+                 [:wait-a-minute :go]]
+   :canvas {:go {:x 32 :y 211 :h 255 :w 240 :view-mode "data"}
+            :check {:x 494 :y 429 :h 587 :w 527 :view-mode "data"}
+            :view-memory {:x 1844 :y 748 :h 504 :w 1731 :view-mode "view"}
+            :memory {:x 1297 :y 727 :h 186 :w 355 :view-mode "grid"}
+            "thread0"
+            {:inputs [[:check [:text [:map [:v :threads :current]]]]] :x 1235 :y 999 :h 215 :w 400}
+            "mem0"
+            {:inputs [[:check [:text [:map [:v :memory :heap-usage :used]]]]] :x 1276 :y 96 :h 215 :w 400}
+            :threads {:x 1246 :y 387 :h 211 :w 449 :view-mode "grid"}
+            :view-threads {:x 1851 :y 217 :h 486 :w 1726 :view-mode "view"}
+            :wait-a-minute {:x 1849 :y -40 :h 201 :w 217 :view-mode "data"}}})
 
 ;; subflow test
 (def sub-flow {:description "Flow within a flow"
@@ -174,8 +288,9 @@
                               :comp2 20
                               :comp3 [133 45]
                               :simple-plus-10 {:fn #(+ 10 %)
-                                               :speak (fn [x]
-                                                        (str "Hey genius! I figured out your brain-buster of a math problem... It's " x))}
+                                               ;:speak (fn [x]
+                                               ;         (str "Hey genius! I figured out your brain-buster of a math problem... It's " x))
+                                               }
                               :add-one #(+ 1 %)
                               :adder-one {:fn #(apply + %)
                                           :inputs [:in]}
@@ -185,7 +300,8 @@
                                [:comp2 :adder/in2]
                                [:comp3 :adder-one/in]
                                [:adder-one :add-one]
-                               [:adder :simple-plus-10]]
+                               [:adder :simple-plus-10]
+                               [:simple-plus-10 :done]]
                  :canvas {:adder-one {:x 1009 :y 765 :h 207 :w 297 :view-mode "data"}
                           :add-one {:x 1400 :y 754 :h 247 :w 440 :view-mode "data"}
                           :adder-one/in {:x 650 :y 746 :h 255 :w 240 :view-mode "data"}
@@ -262,7 +378,7 @@
 (def looping-net {:components {:comp1 10
                                :comp2 20.1
                                :comp3 [133 45]
-                               :tester '(fn [x] (+ 8 x))
+                               :tester (fn [x] (+ 8 x))
                                :simple-plus-10 {:fn #(+ 10 %)}
                                :add-one {:fn #(+ % 1)}
                                :add-one2 {:fn #(+ 1 %)}
@@ -314,7 +430,7 @@
                                                                               "guide-title" {:fill "#ffffff77"}}
                                                                       :view {:stroke "#00000000"}}} {:actions false}])}
                                :add-one4 {:fn #(do ;(Thread/sleep 100)
-                                                   (+ 45 %))
+                                                   (+ (rand-int 50) %))
                                           :cond {:condicane2 #(> % 800)}}
                             ;;    :display-val {:fn (fn [x] x)
                             ;;                  :view (fn [x]
@@ -330,7 +446,8 @@
                                                           :vec [true false 1 3 4 4.234234 "bang!"]
                                                           ;:random-str (str "omg-" (rand-int 123) "!")
                                                           })}
-                               :whoops {:fn #(str % ". YES.")}
+                               :whoops {:fn #(do (reset! vv []) ;; since we're done, clean up atom
+                                               (str % ". YES."))}
                                :condicane {:fn #(str % " condicane!")}
                                :condicane2 {:fn #(str "FINAL VAL: " % " DONE")}
                                :baddie #(str % " is so bad!")

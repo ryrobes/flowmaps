@@ -1,4 +1,5 @@
 (ns flowmaps.core-test
+  (:refer-clojure :exclude [abs update-vals update-keys])
   (:require [clojure.test :refer :all]
             [clojure.string :as cstr]
             [clojure.core.async :as async]
@@ -87,7 +88,6 @@
 (def test-flow-map-1 {:components {:comp1 10
                                    :comp2 20
                                    :comp3 [133 45]
-                                   :tester '(fn [x] (+ 8 x))
                                    :simple-plus-10 {:fn #(+ 10 %)
                                                     :x 1222 :y 312}
                                    :add-one {:fn #(+ % 1)
