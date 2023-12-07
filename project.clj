@@ -23,7 +23,7 @@
                  [com.fasterxml.jackson.core/jackson-core "2.14.0-rc1"] ;; for websocket-layer
                  ;[spyscope "0.1.6"]
                  [philoskim/debux "0.8.3"]
-                 [duratom "0.5.8"]
+                 ;[duratom "0.5.8"]
                  ;[selmer "1.12.59"]
                  [org.clojars.rutledgepaulv/websocket-layer "0.1.10" ;; exclusions recommended by `lein deps :tree`
                   :exclusions [joda-time com.cognitect/transit-java org.clojure/core.memoize

@@ -45,6 +45,10 @@
               ::http/routes routes
               ::http/allowed-origins {:creds false :allowed-origins (constantly true)}
               ::http/secure-headers {:content-security-policy-settings {:object-src "none"}}
+              ;::http/secure-headers {:content-security-policy-settings {;:default-src "*"
+              ;                                                          ;:script-src "*"
+              ;                                                          :frame-ancestors "*"}
+              ;                       :x-frame-options "ALLOW"}
               ::http/resource-path "/public"
               :max-threads 50
               ::http/type :jetty
