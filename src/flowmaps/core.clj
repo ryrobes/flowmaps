@@ -139,27 +139,29 @@
                               (flatten v)))})))
 
 (defn- end-chain-msg [flow-id fp ff result the-path debug?] ;; TODO better calc of pathfinding to derive natural end points w/o :done blocks
-  (let [fp-vals (vec (for [f the-path] [f (get-in @db/results-atom [flow-id f])]))
-        res-paths (distinct (get @db/resolved-paths flow-id))
-        chains (count res-paths)
-        last-in-chain? (some #(= the-path %) res-paths)
-        chains-run (+ (count (distinct @db/chains-completed)) 1)
-        all-chains-done? (= chains chains-run)]
-    (when debug?
-      (ut/ppln [the-path :chain-done! ff :done-hop-or-empty  :res-paths res-paths]))
+  (try
+    (let [fp-vals (vec (for [f the-path] [f (get-in @db/results-atom [flow-id f])]))
+          res-paths (distinct (get @db/resolved-paths flow-id))
+          chains (count res-paths)
+          last-in-chain? (some #(= the-path %) res-paths)
+          ;;_ (ut/ppln @db/chains-completed)
+          chains-run (try (+ (count (distinct @db/chains-completed)) 1) (catch Exception _ 1))
+          all-chains-done? (= chains chains-run)]
+      (when debug?
+        (ut/ppln [the-path :chain-done! ff :done-hop-or-empty  :res-paths res-paths]))
 
-    (when last-in-chain?
+      (when last-in-chain?
+        (do
+          (when debug?
+            (ut/ppln [chains-run :chain-done :done-hop ff :steps (count fp-vals) :final-result result
+                      :value-path fp-vals chains-run :of chains :flow-chains-completed]))
+          (swap! db/chains-completed conj the-path))
 
-      (do
-        (when debug?
-          (ut/ppln [chains-run :chain-done :done-hop ff :steps (count fp-vals) :final-result result
-                    :value-path fp-vals chains-run :of chains :flow-chains-completed]))
-        (swap! db/chains-completed conj the-path))
-
-      (when (and all-chains-done? last-in-chain?)
-        (when debug?
-          (ut/ppln [:all-chains-done! :resolved-paths (vec (distinct (get @db/resolved-paths flow-id)))
-                    ff :fp fp :results-atom (get @db/results-atom flow-id)]))))))
+        (when (and all-chains-done? last-in-chain?)
+          (when debug?
+            (ut/ppln [:all-chains-done! :resolved-paths (vec (distinct (get @db/resolved-paths flow-id)))
+                      ff :fp fp :results-atom (get @db/results-atom flow-id)])))))
+    (catch Exception _ nil))) ;; TODO weird bug when close-on-done? is true and we're using an atom as output channel
 
 (defn close-channels! [flow-id]
   (doseq [[k c] (get @db/channels-atom flow-id)]
@@ -170,22 +172,23 @@
              (do (swap! db/channels-atom ut/dissoc-in [flow-id k])
                  (async/close! c)))
            (catch Throwable e (do (swap! db/channels-atom assoc-in [flow-id k] c)
-                                  (ut/ppln [:error-closing-channel-inner e k c])))) ;; close channel
+                                  (ut/ppln [:error-closing-channelS-inner e k c])))) ;; close channel
          ) ;; remove from "live" channel atom
          (catch Throwable e 
            (do (swap! db/channels-atom assoc-in [flow-id k] c) ;; if failed, keep key val for now
-             (ut/ppln [:error-closing-channel-outer e k c]))))))
+             (ut/ppln [:error-closing-channelS-outer e k c]))))))
 
 (defn close-channel! [flow-id channel-id]
   ;(close-channels! [channel-id])
-  (let [ch (get-in @db/channels-atom [flow-id channel-id])]
+  (try (let [ch (get-in @db/channels-atom [flow-id channel-id])]
     ;(ut/ppln [:closing-channel flow-id channel-id])
     (try
       (when (not (nil? ch))
         (do (swap! db/channels-atom ut/dissoc-in [flow-id channel-id])
             (async/close! ch)))
       (catch Throwable e (ut/ppln [:error-closing-channel-inner e flow-id channel-id]))) ;; close channel
-    (swap! db/channels-atom ut/dissoc-in [flow-id channel-id])))
+    (swap! db/channels-atom ut/dissoc-in [flow-id channel-id]))
+       (catch Throwable e (ut/ppln [:error-closing-channel-outer e flow-id channel-id]))))
 
 (declare flow) ;; so we can call it in (process ..) even though it's still undefined at this point
 
@@ -229,7 +232,7 @@
                     done-atom? (instance? clojure.lang.Atom done-ch)
                     channels (+ (count (keys (get @db/channels-atom flow-id)))
                                 (count (keys (get @db/condi-channels-atom flow-id))))]
-                (cond done-atom? (reset! done-ch data-val)
+                (cond done-atom? (when (not (= data-val :done)) (reset! done-ch data-val)) ;;  TODO, weird bug with close-on-done? + atom output
                       (and done-channel? multi-ch?) (doseq [d done-ch] (async/>! d data-val))
                       done-channel? (async/>! done-ch data-val)
                       :else nil)
@@ -873,12 +876,27 @@
      {:on-finished (fn [] (ut/ppln [:schedule-finished! opts time-seq1]))
       :error-handler (fn [e] (ut/ppln [:scheduler-error e]))})))
 
-;; snippets for testing
+;; snippets for testing - 
 
-;(web/start!) ;; boots the webserver and socket server - TODO, will be a fn to start the REST server by itself w/o dev UI
+(web/start!) ;; boots the webserver and socket server - TODO, will be a fn to start the REST server by itself w/o dev UI
 ;(web/stop!)
-;(db/re-init :file "mem-test") ;; persistent atoms (can even change after regular atoms have been used)
-;(flow fex/my-network {:flow-id "baloney-space-men-ahoy-mustard"} nil {:comp1 4545 :comp2 2323}) ;; override subflow values
+;(db/re-init :file "mem-test") ;; persistent atoms (can even change after regular atoms have been used) - DEPRECATED
+
+(flow fex/my-network {:flow-id "baloney-space-men-ahoy-mustard" :close-on-done? true :debug? false} nil {:comp1 4545 :comp2 2323}) ;; override subflow values
+
+  (defn flow-waiter [in-flow]
+    (let [a (atom nil)]
+     ;(ut/pp (vec (remove nil? [:testing-flow-atom-output])))
+      (flow in-flow {:debug? false :close-on-done? true} a)
+      (while (nil? @a)
+        (Thread/sleep 100)) ;; check the atom every 100 ms
+      @a))
+;; (ut/ppln @db/channels-atom)
+(def a (atom nil))
+(flow fex/my-network {:debug? false :close-on-done? true} a)
+
+(ut/ppln [:outs (flow-waiter fex/looping-net)])
+
 ;(flow fex/looping-net)
 ;(flow fex/my-network)
 ;(flow fex/my-network-input)

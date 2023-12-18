@@ -79,8 +79,8 @@
        [[:pushed flow-id channel-name] value]))))
 
 ;; test
-;; curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d '{:value 45 :channel [:int1 :adder/in1]}' http://localhost:8000/flow-value-push/odds-and-evens
-;; curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d '{:value 44 :channel [:int1 :adder/in1] :return [:display-val :done]}' http://localhost:8000/flow-value-push/odds-and-evens
+;; curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d '{:value 45 :channel [:int1 :adder/in1]}' http://localhost:8080/flow-value-push/odds-and-evens
+;; curl -X POST -s -H "Content-Type: application/edn" -H "Accept: application/edn" -d '{:value 44 :channel [:int1 :adder/in1] :return [:display-val :done]}' http://localhost:8080/flow-value-push/odds-and-evens
 
 (defn wait-for-event [channel flow-id start-time timeout-ms]
   (try

@@ -87,9 +87,9 @@ Flow-maps also provides a rabbit-ui visualizer / debugger to help UNDERSTAND and
 * Start up the Rabbit web-server and web-sockets 
     * (only needed for dev / prod can be headless)
     ```clojure
-    (fweb/start!) ;; starts up the rabbit-ui viewer at http://localhost:8888/ 
+    (fweb/start!) ;; starts up the rabbit-ui viewer at http://localhost:8080/ 
     ```    
-* Open up the URL - but just leave it for now - http://localhost:8888/ 
+* Open up the URL - but just leave it for now - http://localhost:8080/ 
 
 ![rabbit web ui](https://app.rabbitremix.com/ready-to-flow.png)
 
@@ -677,7 +677,7 @@ Simple sample usage:
                                [:comp2 :adder/in2]
                                [:adder :simple-plus-10]]}) ;; but use the whole block as output
 
-(fweb/start!) ;; starts up the rabbit-ui viewer at http://localhost:8888/ 
+(fweb/start!) ;; starts up the rabbit-ui viewer at http://localhost:8080/ 
 (fm/flow first-flow) ;; starts the flow, look upon ye rabbit and rejoice!
 ```
 
@@ -797,7 +797,7 @@ A slight ramp up in complexity from the above flow. Contains a loop that exists 
                    :display-val {:x 768 :y 662 :h 179 :w 320}
                    :adder/in2 {:x 430 :y 430 :h 175 :w 232}}})
 
-(fweb/start!) ;; starts up the rabbit-ui viewer at http://localhost:8888/ 
+(fweb/start!) ;; starts up the rabbit-ui viewer at http://localhost:8080/ 
 (fm/flow looping-flow) ;; starts the flow, look upon ye rabbit and rejoice!
 
 ```
@@ -832,7 +832,7 @@ Simple options example:
                             [:* :done]]}) ;; note the :done meta block, so it knows what to "return"
 
 (def res (atom nil)) ;; create an atom to hold the value (could also use a channel)
-(fweb/start!) ;; starts up a rabbit at http://localhost:8888/ 
+(fweb/start!) ;; starts up a rabbit at http://localhost:8080/ 
 
 (fm/flow my-flow {:debug? false} res) ;; adding res atom as the eventual receiver of the final value / signal
 
@@ -923,7 +923,7 @@ When the web ui is first booted up via...
 ```clojure
 (fweb/start!) ;; flowmaps.web/start! or stop!
 ;; returns:   
-[:*web "starting web ui @ http://localhost:8888" "🐇"]
+[:*web "starting web ui @ http://localhost:8080" "🐇"]
 ```
 ...you will see a blank canvas that won't show anything until a flow is run. Obviously this data is not pushed out unless rabbit is running in your REPL or application.
 

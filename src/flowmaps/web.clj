@@ -53,7 +53,7 @@
               :max-threads 50
               ::http/type :jetty
               ::http/host "0.0.0.0"
-              ::http/port 8000
+              ::http/port 8080
               ::http/container-options {:h2c? true
                                         :h2? false
                                         :ssl? false}})
@@ -63,11 +63,11 @@
 (def web-server (atom nil))
 
 (defn create-web-server! []
-  (ut/ppln [:*web (format "starting web ui @ http://localhost:%d" 8000) "🐇" ])
+  (ut/ppln [:*web (format "starting web ui @ http://localhost:%d" 8080) "🐇" ])
   (reset! web-server (future (http/start runnable-service))))
 
 (defn destroy-web-server! []
-  (ut/ppln [:*web (format "stopping web server @ %d" 8000)])
+  (ut/ppln [:*web (format "stopping web server @ %d" 8080)])
   (reset! web-server nil))
 
 (defn start! [] ;; start the web server and websocket server
@@ -86,7 +86,7 @@
 (defmethod wl/handle-subscription :external-editing [{:keys [kind client-id]}] ;; default subscription server->client push "queue"...
   (let [results (async/chan)]
     (async/go-loop []
-      (async/<! (async/timeout 500)) ;; 600-800 seems ideal
+      (async/<! (async/timeout 800)) ;; 600-800 seems ideal
       (if-let [item (ut/dequeue! queue-atom)]
         (when (async/>! results item)
           (recur))
