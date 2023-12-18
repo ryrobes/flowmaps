@@ -878,24 +878,24 @@
 
 ;; snippets for testing - 
 
-(web/start!) ;; boots the webserver and socket server - TODO, will be a fn to start the REST server by itself w/o dev UI
+;(web/start!) ;; boots the webserver and socket server - TODO, will be a fn to start the REST server by itself w/o dev UI
 ;(web/stop!)
 ;(db/re-init :file "mem-test") ;; persistent atoms (can even change after regular atoms have been used) - DEPRECATED
 
-(flow fex/my-network {:flow-id "baloney-space-men-ahoy-mustard" :close-on-done? true :debug? false} nil {:comp1 4545 :comp2 2323}) ;; override subflow values
+;; (flow fex/my-network {:flow-id "baloney-space-men-ahoy-mustard" :close-on-done? true :debug? false} nil {:comp1 4545 :comp2 2323}) ;; override subflow values
 
-  (defn flow-waiter [in-flow]
-    (let [a (atom nil)]
-     ;(ut/pp (vec (remove nil? [:testing-flow-atom-output])))
-      (flow in-flow {:debug? false :close-on-done? true} a)
-      (while (nil? @a)
-        (Thread/sleep 100)) ;; check the atom every 100 ms
-      @a))
-;; (ut/ppln @db/channels-atom)
-(def a (atom nil))
-(flow fex/my-network {:debug? false :close-on-done? true} a)
+;;   (defn flow-waiter [in-flow]
+;;     (let [a (atom nil)]
+;;      ;(ut/pp (vec (remove nil? [:testing-flow-atom-output])))
+;;       (flow in-flow {:debug? false :close-on-done? true} a)
+;;       (while (nil? @a)
+;;         (Thread/sleep 100)) ;; check the atom every 100 ms
+;;       @a))
+;; ;; (ut/ppln @db/channels-atom)
+;; (def a (atom nil))
+;; (flow fex/my-network {:debug? false :close-on-done? true} a)
 
-(ut/ppln [:outs (flow-waiter fex/looping-net)])
+;; (ut/ppln [:outs (flow-waiter fex/looping-net)])
 
 ;(flow fex/looping-net)
 ;(flow fex/my-network)
