@@ -541,7 +541,8 @@
 
       ;; procedural clean up - TODO when DB
       (let [flow-id (or (get opts-map :flow-id) (ut/generate-name))
-            flow-id (if (not (= flow-id "live-scratch-flow"))
+            increment-id? (get opts-map :increment-id? true)
+            flow-id (if increment-id? ;(not (= flow-id "live-scratch-flow"))
                       (str flow-id "-" (count (filter #(cstr/starts-with? % flow-id) (keys @db/channel-history))))
                       flow-id)] ;; don't number the scratch-flow iterations...
         (swap! db/results-atom dissoc flow-id)
@@ -857,32 +858,60 @@
   ;; fn version of rest/flow-point-push 
   )
 
+;; (defn schedule! [time-seq1 flowmap & args]
+;;   (let [[opts chan-out override] args
+;;         opts (if (nil? opts) {} opts)
+;;         times (if (and (vector? time-seq1) (keyword? (first time-seq1)))
+;;                 (doall (take 1000 (ut/time-seq time-seq1)))
+;;                 time-seq1)] ;; if custom time list, just send it.
+;;     ;(ut/ppln [:times times :time-seq time-seq1])
+;;     (swap! db/live-schedules conj {:flow-id (get opts :flow-id "unnamed-flow-sched")
+;;                                    :override override
+;;                                    :schedule (if (vector? time-seq1) time-seq1 [:custom-time-fn])})
+
+;;     (chime/chime-at
+;;      times ;; [] chime time seq, https://github.com/jarohen/chime#recurring-schedules
+;;      (fn [time]
+;;        (let [opts (merge opts {:schedule-started (str time)})]
+;;          (flow flowmap opts chan-out override)))
+;;      {:on-finished (fn [] (ut/ppln [:schedule-finished! opts time-seq1]))
+;;       :error-handler (fn [e] (ut/ppln [:scheduler-error e]))})))
+
 (defn schedule! [time-seq1 flowmap & args]
   (let [[opts chan-out override] args
         opts (if (nil? opts) {} opts)
         times (if (and (vector? time-seq1) (keyword? (first time-seq1)))
                 (doall (take 1000 (ut/time-seq time-seq1)))
-                time-seq1)] ;; if custom time list, just send it.
-    ;(ut/ppln [:times times :time-seq time-seq1])
+                time-seq1)
+        ch (chime/chime-at
+            times ;; [] chime time seq, https://github.com/jarohen/chime#recurring-schedules
+            (fn [time]
+              (let [opts (merge opts {:schedule-started (str time)})]
+                (flow flowmap opts chan-out override)))
+            {:on-finished (fn [] (ut/ppln [:schedule-finished! opts time-seq1]))
+             :error-handler (fn [e] (ut/ppln [:scheduler-error e]))})] ;; if custom time list, just send it.
+      ;; save channel ref for closing later w unschedule! 
+      ;; update the live schedules atom with the new schedule entry
     (swap! db/live-schedules conj {:flow-id (get opts :flow-id "unnamed-flow-sched")
                                    :override override
-                                   :schedule (if (vector? time-seq1) time-seq1 [:custom-time-fn])})
+                                   :next-times (try (vec (map str times)) (catch Exception _ times))
+                                   :schedule (if (vector? time-seq1) time-seq1 [:custom-time-fn])
+                                   :channel ch})))
 
-    (chime/chime-at
-     times ;; [] chime time seq, https://github.com/jarohen/chime#recurring-schedules
-     (fn [time]
-       (let [opts (merge opts {:schedule-started (str time)})]
-         (flow flowmap opts chan-out override)))
-     {:on-finished (fn [] (ut/ppln [:schedule-finished! opts time-seq1]))
-      :error-handler (fn [e] (ut/ppln [:scheduler-error e]))})))
+(defn unschedule! [flow-id]
+  (let [schedule-to-remove (some #(when (= (:flow-id %) flow-id) %) @db/live-schedules)]
+    (when schedule-to-remove
+      ;; Close the channel associated with the schedule
+      (async/close! (:channel schedule-to-remove))
+      ;; Remove the schedule from the live schedules atom
+      (swap! db/live-schedules #(remove (fn [x] (= (:flow-id x) flow-id)) %)))))
 
 ;; snippets for testing - 
 
 ;(web/start!) ;; boots the webserver and socket server - TODO, will be a fn to start the REST server by itself w/o dev UI
 ;(web/stop!)
 ;(db/re-init :file "mem-test") ;; persistent atoms (can even change after regular atoms have been used) - DEPRECATED
-
-;; (flow fex/my-network {:flow-id "baloney-space-men-ahoy-mustard" :close-on-done? true :debug? false} nil {:comp1 4545 :comp2 2323}) ;; override subflow values
+;(flow fex/my-network {:flow-id "baloney-space-men-ahoy-mustard" :close-on-done? true :debug? false} nil {:comp1 4545 :comp2 2323}) ;; override subflow values
 
 ;;   (defn flow-waiter [in-flow]
 ;;     (let [a (atom nil)]

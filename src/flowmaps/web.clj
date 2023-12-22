@@ -34,7 +34,7 @@
 (defonce websocket-server (delay (jetty/run-jetty #'web-handler ring-options))) ;; delay and @call?
 
 ;;; super simple pedestal cfg for serving static SPA re-frame root...
-(defn static-root [_] (ring-resp/content-type (ring-resp/resource-response "index.html" {:root "public"}) "text/html"))
+(defn static-root [_] (ring-resp/content-type (ring-resp/resource-response "index.html" {:root "public-flowmaps"}) "text/html"))
 (def common-interceptors [(body-params/body-params) http/html-body])
 
 (def routes #{["/" :get (conj common-interceptors `static-root)]
@@ -49,7 +49,7 @@
               ;                                                          ;:script-src "*"
               ;                                                          :frame-ancestors "*"}
               ;                       :x-frame-options "ALLOW"}
-              ::http/resource-path "/public"
+              ::http/resource-path "/public-flowmaps"
               :max-threads 50
               ::http/type :jetty
               ::http/host "0.0.0.0"
@@ -63,7 +63,7 @@
 (def web-server (atom nil))
 
 (defn create-web-server! []
-  (ut/ppln [:*web (format "starting web ui @ http://localhost:%d" 8080) "🐇" ])
+  (ut/ppln [:*web (format "starting flowmaps web ui debugger @ http://localhost:%d" 8080) "🐇" ])
   (reset! web-server (future (http/start runnable-service))))
 
 (defn destroy-web-server! []
