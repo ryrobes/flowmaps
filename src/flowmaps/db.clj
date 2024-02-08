@@ -1,6 +1,6 @@
 (ns flowmaps.db
   (:refer-clojure :exclude [abs update-vals update-keys])
-  (:require 
+  (:require
   ;[duratom.core :as da]
    [clojure.java.shell :as shell]))
 
@@ -48,6 +48,8 @@
 (def results-atom (atom {})); (datom {} "results-atom")) ;; basically a log
 (def resolved-paths (atom {})); (datom {} "resolved-paths"))
 (def channel-history (atom {})); (datom {} "channel-history"))
+(def tracker (atom {})) ;; experiment to easier track running blocks
+(def status (atom {})) ;; experiment to easier track running/not running solely
 ;(def channel-history2 (atom {})) ;; waiting time
 (def fn-history (atom {})); (datom {} "fn-history"))
 (def block-dump (atom {})); (datom {} "block-dump"))

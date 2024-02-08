@@ -164,6 +164,7 @@
     (catch Exception _ nil))) ;; TODO weird bug when close-on-done? is true and we're using an atom as output channel
 
 (defn close-channels! [flow-id]
+  (Thread/sleep 5000)
   (doseq [[k c] (get @db/channels-atom flow-id)]
     (try #_{:clj-kondo/ignore [:redundant-do]}
      (do ;(ut/ppln [:closing-channel k c])
@@ -201,7 +202,7 @@
     (try
       (async/go-loop [pending-chs input-chs]
         (when (seq pending-chs)
-          (let [wstart (System/currentTimeMillis) ;; start on channel (for waits)
+          (let [;wstart (System/currentTimeMillis) ;; start on channel (for waits)
                 [data ch] (async/alts! pending-chs)
                 data-from (get data :sender)
                 data-val (get data :value :done)
@@ -230,20 +231,24 @@
               (let [done-channel? valid-output-channels? ;(ut/chan? done-ch)
                     multi-ch? (seqable? done-ch)
                     done-atom? (instance? clojure.lang.Atom done-ch)
-                    channels (+ (count (keys (get @db/channels-atom flow-id)))
-                                (count (keys (get @db/condi-channels-atom flow-id))))]
+                    ;; channels (+ (count (keys (get @db/channels-atom flow-id)))
+                    ;;             (count (keys (get @db/condi-channels-atom flow-id))))
+                    ]
                 (cond done-atom? (when (not (= data-val :done)) (reset! done-ch data-val)) ;;  TODO, weird bug with close-on-done? + atom output
                       (and done-channel? multi-ch?) (doseq [d done-ch] (async/>! d data-val))
                       done-channel? (async/>! done-ch data-val)
                       :else nil)
-                (when close-on-done?
-                  (close-channels! flow-id)) ;; kill all channels for this flow. we done.
-              ;(println (str data-val))
-                (pp [:done-block-reached (cond done-atom? [:sending-to-atom done-ch]
-                                               done-channel? [:sending-to-channel done-ch]
-                                               :else [:ending-flow-chain (if debug?
-                                                                           [:debug-keeping channels :channels-open]
-                                                                           [:closing channels :channels])])])))
+                ;; (when close-on-done?
+                ;;   (close-channels! flow-id)) ;; kill all channels for this flow. we done.
+
+              ;(println (str data-val)) ;;; commented out due to "Method Too Large" for the parent async Go loop.... :/
+                ;; (pp [:done-block-reached (cond done-atom? [:sending-to-atom done-ch]
+                ;;                                done-channel? [:sending-to-channel done-ch]
+                ;;                                :else [:ending-flow-chain (if debug?
+                ;;                                                            [:debug-keeping channels :channels-open]
+                ;;                                                            [:closing channels :channels])])])
+                
+                ))
 
             (when is-accumulating-ports?
               (swap! db/port-accumulator assoc ff (merge (get @db/port-accumulator ff {}) data-val))) ;; ff is the TO...
@@ -254,6 +259,7 @@
                                                                     data-val)]
                                                             {:path the-path ;; PRE RECUR HISTORY PUSH.
                                                              :type :channel
+                                                             :run-id (get opts-map :run-id)
                                                              :channel [data-from ff]
                                                              :base-flow-id (str base-flow-id)
                                                              :dest ff
@@ -262,7 +268,8 @@
                                                              :value (ut/limited v flow-id)
                                                              :data-type (ut/data-typer v)}))
 
-            (when (and (or (nil? data-val) (= data-val :done))
+            ;; test short-circuit - 12/31/23
+            (when (and (or (nil? data-val) (= data-val :done)) ;;false 
                        close-on-done?)
 
               (let [chk (ut/keypaths (get @db/channels-atom flow-id))
@@ -270,6 +277,7 @@
                     chp (get chkp ch)]
               ;(ut/ppln [:CLOSE [data-from ff chk chkp chp]])
                 (close-channel! flow-id chp)))
+            
 
             (if (or (and (not (ut/namespaced? ff))
                          (not (ut/namespaced? data-from)))
@@ -282,6 +290,10 @@
                 ;; (when close-on-done? (do (ut/ppln [:CLOSE [data-from ff]])
                 ;;                            (close-channel! [data-from ff])))
                   (pp [:chain-done! ff :done-signal])
+                  (when (get data-val :error) ;; if ending due to premature error - TODO as its own things
+                    (swap! db/results-atom assoc-in [flow-id :done] [:error! ff data-val])
+                    (swap! db/tracker assoc-in [flow-id ff :end] (System/currentTimeMillis)) ;; stop all trackers
+                    (swap! db/status assoc-in [flow-id :end] (System/currentTimeMillis))) ;; force error to be last value
                   (end-chain-msg flow-id fp ff nil the-path debug?))
 
                 (let [block-fn-raw? (fn? block-function)
@@ -309,12 +321,15 @@
                                                                 (for [[k v] (dissoc (get @db/port-accumulator ff) ;data-val 
                                                                                     :port-in?)]
                                                                   {(keyword (last (cstr/split (str (ut/unkeyword k)) #"/"))) v})))
+                      _ (swap! db/tracker assoc-in [flow-id ff :start] start)
                       expression (delay (try
                                           (cond (not pre-when?) [:failed-pre-check :w-input pre-in] ;; failed pre-when input check - send error message
                                                 (and fully-resolved? is-subflow?) ;(and is-subflow? fully-resolved?)
                                                 (let [a (atom nil)] ;; use temp atom to hold subflow results and treat like regular fn
                                                   (flow block-function (merge (select-keys opts-map [:increment-id?])
                                                                               {:flow-id (str flow-id "/" (ut/unkeyword ff))
+                                                                               :parent-run-id (get opts-map :run-id) ;; pass from parent flow
+                                                                               :client-name (get opts-map :client-name) ;; pass from parent flow
                                                                                :debug? debug?}) a ;output-chs
                                                         subflow-overrides)
                                                   (while (nil? @a)
@@ -323,7 +338,7 @@
                                                 block-fn-raw? (block-function data-val)
                                                 block-is-port? {:port-in? true ff data-val} ;; just accumulating here?
                                                 :else ((get block-function :fn) data-val))
-                                          (catch Exception e
+                                          (catch Throwable e ;Exception e ;; evaling user code here, want to prevent breakage (except for stackoverflows.. TODO)
                                             (do (ut/ppln [:chain-dead! :exec-error-in ff :processing data-val
                                                           :from data-from :block-fns block-function :error e]) ; :done
                                                 {:error (str e)}))))
@@ -332,6 +347,8 @@
                                                      is-subflow? (let [a (atom nil)] ;; use temp atom to hold subflow results and treat like regular fn
                                                                    (flow block-function (merge (select-keys opts-map [:increment-id?])
                                                                                                {:flow-id (str flow-id "/" (ut/unkeyword ff))
+                                                                                                :parent-run-id (get opts-map :run-id) ;; pass from parent flow
+                                                                                                :client-name (get opts-map :client-name) ;; pass from parent flow
                                                                                                 :debug? debug?}) a ;output-chs
                                                                          subflow-overrides)
                                                                    (while (nil? @a)
@@ -341,7 +358,7 @@
                                                      block-fn-raw? (dx/dbgt_ (block-function data-val))
                                                      block-is-port? (dx/dbgt_ {:port-in? true ff data-val}) ;; just accumulating here?
                                                      :else (dx/dbgt_ ((get block-function :fn) data-val)))
-                                               (catch Exception e
+                                               (catch Throwable e ;Exception e ;; evaling user code here, want to prevent breakage (except for stackoverflows.. TODO)
                                                  (do (ut/ppln [:chain-dead! :exec-error-in ff :processing data-val
                                                                :from data-from :block-fns block-function :error e]) ; :done
                                                      {:error (str e)}))))
@@ -458,6 +475,7 @@
                                                                                             :path the-path
                                                                                             :value (ut/limited (value-only result) flow-id)
                                                                                             :type :function
+                                                                                            :run-id (get opts-map :run-id)
                                                                                             :base-flow-id (str base-flow-id)
                                                                                             :dest ff
                                                                                             :channel [ff]
@@ -465,6 +483,14 @@
                                                                                             :data-type (ut/data-typer (ut/limited (get web-val-map :v) flow-id))
                                                                                             :start fn-start :end fn-end
                                                                                             :elapsed-ms elapsed-ms}))
+                  (do (swap! db/tracker assoc-in [flow-id ff :end] (System/currentTimeMillis)) ;; test
+                      ;(swap! db/status  assoc-in [flow-id :last-tick] (System/currentTimeMillis))
+                      (when (= ff :done) ;(let [] ;[tt (System/currentTimeMillis)
+                                               ;mse (- tt (get-in @db/status [flow-id :start]))
+                                               ;] ;; simple done/not-done atom to track recent flow completions
+                                           (swap! db/status assoc-in [flow-id :end] (System/currentTimeMillis)) ;; test 1/23/2024 ry
+                                           ;(swap! db/status assoc-in [flow-id :ms] mse)
+                                           ));) ;; simple pre-materialize for watchers
                ; (swap! db/history-atom conj result-map) ;; everything map log
 
                   (try (pp [:block ff [data-from ff]
@@ -547,6 +573,8 @@
       (let [flow-id (or (get opts-map :flow-id) (ut/generate-name))
             increment-id? (get opts-map :increment-id? true)
             base-flow-id flow-id ;; saving for later before below mutation
+            run-id (str (java.util.UUID/randomUUID))
+            parent-run-id (get opts-map :parent-run-id)
             flow-id (if increment-id? ;(not (= flow-id "live-scratch-flow"))
                       (str flow-id "-" (count (filter #(cstr/starts-with? % flow-id) (keys @db/channel-history))))
                       flow-id)] ;; don't number the scratch-flow iterations...
@@ -555,6 +583,8 @@
         ;(swap! db/channel-history2 dissoc flow-id)
         (swap! db/fn-history dissoc flow-id)
         (swap! db/block-dump dissoc flow-id)
+        (swap! db/tracker dissoc flow-id)
+        (swap! db/status dissoc flow-id)
         (swap! db/waffle-data dissoc flow-id)
         (swap! db/block-defs dissoc flow-id) ;; save and ship these in case the UI somehow missed a creation (saves the UI from weird state)
 
@@ -571,7 +601,7 @@
 
         (try
           (let [{:keys [components connections]} network-map
-                opts-map (merge {:debug? true :debux? false :close-on-done? false} opts-map) ;; merge w defaults, pass as map to process
+                opts-map (merge {:debug? true :debux? false :close-on-done? false :run-id run-id} opts-map) ;; merge w defaults, pass as map to process
                 {:keys [debug? debux?]} opts-map
                 pp (if debug? ut/ppln ut/pplno) ;; TODO, gross.
                 web-push? (true? @web/websocket?)
@@ -621,6 +651,10 @@
                                      (for [b (keys components)]
                                        {b (vec (remove #{b} (flatten (filter #(= (second %) b) connections))))}))
                 started (atom #{})]
+            (when parent-run-id
+              (swap! db/results-atom assoc-in [flow-id :parent-run-id] parent-run-id))
+            (swap! db/results-atom assoc-in [flow-id :run-id] run-id)     ;; uid for this run - 2/1/24 for rvbbit history scrubber
+            (swap! db/results-atom assoc-in [flow-id :opts-map] opts-map) ;; extra arbitrary data, client-id, etd - 2/1/24 for rvbbit history scrubber
             (when web-push? (rest/push! flow-id :none [flow-id :blocks] {}))
             (swap! db/working-data assoc
                    flow-id ;; network-map 
@@ -717,6 +751,7 @@
               (swap! db/channel-history update flow-id conj {:path [:creating-channels :*]
                                                              :channel c
                                                              :base-flow-id (str base-flow-id)
+                                                             :run-id (get opts-map :run-id)
                                                              :start (System/currentTimeMillis)
                                                              :end (System/currentTimeMillis)
                                                              :value nil
@@ -744,7 +779,7 @@
                         from-val (if text-input? (last from-val) from-val)
                         ;from-val (get from-val :fn from-val) ;; heh. temp fix, for static blocks and pushing, refactor right before v1.0
                         ;from-val (if (get from-val :fn) (get from-val :fn) from-val)
-                        ]
+                        _ (swap! db/tracker assoc-in [flow-id from] {:start start :end start :static? true})]
                     (when (some #(= % from) (get network-map :hide))
                       (swap! db/hidden-values assoc-in [flow-id from-val] "***HIDDEN-FROM-UI***"))
                     (when web-push? (rest/push! flow-id from [flow-id :blocks from :body]
@@ -760,6 +795,7 @@
                                                                                               :value (ut/limited from-val flow-id)
                                                                                               :base-flow-id (str base-flow-id)
                                                                                               :type :function
+                                                                                              :run-id (get opts-map :run-id)
                                                                                               :dest from
                                                                                               :channel [from]
                                                                                               :data-type (ut/data-typer (ut/limited from-val flow-id))
@@ -812,6 +848,7 @@
                                                                                                   :value (ut/limited from-val flow-id)
                                                                                                   :base-flow-id (str base-flow-id)
                                                                                                   :type :function
+                                                                                                  :run-id (get opts-map :run-id)
                                                                                                   :dest from
                                                                                                   :channel [from]
                                                                                                   :data-type (ut/data-typer (ut/limited from-val flow-id))

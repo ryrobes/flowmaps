@@ -44,7 +44,7 @@
 ;; odds and ends
 
 (defn time-seq [v]
-  (let [{:keys [days minutes seconds weeks months at starts tz]
+  (let [{:keys [days minutes seconds hours weeks months at starts tz]
          :or {tz (ZoneId/systemDefault)}} (apply hash-map v)
         zone-id (if (instance? String tz) (ZoneId/of tz) tz)
         starting-instant (if starts
@@ -61,6 +61,15 @@
              (.plus (Period/ofDays days)))
          (Period/ofDays days))
         (chime/periodic-seq starting-instant (Period/ofDays days)))
+
+      hours
+      (if at
+        (chime/periodic-seq
+         (-> (LocalTime/of (quot at 100) (mod at 100))
+             (.adjustInto (ZonedDateTime/now zone-id))
+             .toInstant)
+         (Duration/ofHours hours))
+        (chime/periodic-seq (Instant/now) (Duration/ofHours hours)))
 
       minutes
       (if at
